@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function hasVerifiedEmail() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string;
+    }
+
+    function hasEditorAccessDoc() {
+      return hasVerifiedEmail()
+        && exists(/databases/$(database)/documents/editor_access/$(request.auth.token.email));
+    }
+
+    function isConfiguredEditor() {
+      return hasEditorAccessDoc()
+        && get(/databases/$(database)/documents/editor_access/$(request.auth.token.email)).data.enabled != false;
+    }
+
+    function isEditor() {
+      return isConfiguredEditor();
+    }
+
+    function isAdmin() {
+      return hasVerifiedEmail()
+        && request.auth.token.email == "wjddndj2@gmail.com";
+    }
+
+    // 핀볼 게임 기록은 아무나 돌린 테스트까지 다 쌓이면 의미가 없어서,
+    // 스트리머 본인 등 지정된 계정으로 로그인했을 때만 기록되게 한다.
+    // TODO: 빈스 본인 계정 이메일이 정해지면 여기에 추가
+    function isGameLogRunner() {
+      return hasVerifiedEmail()
+        && request.auth.token.email == "wjddndj2@gmail.com";
+    }
+
+    function isOwnVersionSaveUpdate() {
+      return isEditor()
+        && resource != null
+        && request.resource != null
+        && resource.data.savedBy == request.auth.token.email
+        && request.resource.data.savedBy == request.auth.token.email
+        && resource.data.action == "save"
+        && request.resource.data.action == "save";
+    }
+
+    match /editor_access/{emailId} {
+      allow read: if hasVerifiedEmail() && emailId == request.auth.token.email;
+      allow write: if isEditor();
+    }
+
+    match /calendar_overrides/{monthId} {
+      allow read: if true;
+      allow write: if isEditor();
+
+      match /versions/{versionId} {
+        allow read: if isAdmin();
+        allow create: if isEditor();
+        allow update: if isAdmin() || isOwnVersionSaveUpdate();
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /postit/{docId} {
+      allow read: if true;
+      allow write: if isEditor();
+    }
+
+    match /songbook/{docId} {
+      allow read: if true;
+      allow write: if isEditor();
+    }
+
+    match /site_stats/{docId} {
+      allow read: if true;
+      allow write: if docId == "visits" && request.resource.data.keys().hasOnly(["daily"]);
+    }
+
+    match /game_logs/{logId} {
+      allow read: if true;
+      allow create: if isGameLogRunner()
+        && request.resource.data.keys().hasOnly(["createdAt", "stageTitle", "participantCount", "ranking", "runBy"])
+        && request.resource.data.runBy == request.auth.token.email;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
