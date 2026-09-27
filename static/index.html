@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dongle:wght@400;700&family=Edu+VIC+WA+NT+Hand:wght@400..700&family=Gugi&family=Noto+Sans:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=2026-09-28-1">
 </head>
 <body data-theme="light">
   <div class="page-glow" aria-hidden="true"></div>
@@ -53,26 +53,16 @@
 
   <main class="main-with-nav">
     <section class="hero" id="hero">
+      <video class="hero-video" id="hero-video" autoplay muted playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
+      <video class="hero-video hero-video-buffer" id="hero-video-buffer" muted playsinline preload="auto" aria-hidden="true"></video>
+      <img class="hero-image" id="hero-image" src="/static/assets/vince-profile.webp" alt="빈스 캘린더 표지 이미지">
+      <div class="hero-scrim"></div>
       <div class="hero-aura" aria-hidden="true"></div>
       <div class="hero-content">
-        <div class="hero-diary">
-          <div class="hero-binder-clip" aria-hidden="true"><span></span></div>
-          <div class="hero-diary-cover">
-            <h1><span>빈스</span><span>캘린더</span></h1>
-          </div>
-          <div class="hero-screen-shell">
-            <div class="hero-photo-tape" aria-hidden="true"></div>
-            <div class="hero-screen-frame">
-              <video class="hero-video" id="hero-video" autoplay muted playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
-              <video class="hero-video hero-video-buffer" id="hero-video-buffer" muted playsinline preload="auto" aria-hidden="true"></video>
-              <img class="hero-image hidden" id="hero-image" alt="빈스 캘린더 표지 이미지">
-              <div class="hero-scrim"></div>
-            </div>
-          </div>
-          <div class="hero-actions hidden">
-            <button id="open-current-month" class="hero-link" type="button">일정 보기</button>
-            <button id="open-songbook-hero" class="hero-secondary-link" type="button">노래책</button>
-          </div>
+        <h1><span>빈스</span><span>캘린더</span></h1>
+        <div class="hero-actions">
+          <button id="open-current-month" class="hero-link" type="button">일정 보기</button>
+          <button id="open-songbook-hero" class="hero-secondary-link" type="button">노래책</button>
         </div>
       </div>
     </section>

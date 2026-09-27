@@ -1324,7 +1324,7 @@ function preferredTheme() {
   if (stored === "dark" || stored === "light") {
     return stored;
   }
-  return "light";
+  return "dark";
 }
 
 function applyTheme(theme) {
