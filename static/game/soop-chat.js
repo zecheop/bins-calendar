@@ -16,6 +16,13 @@
  * 수신 패킷은 전체를 "\x0c"로 나눴을 때 [0]이 헤더 덩어리(ESC+타입+길이+"00")를
  * 통째로 담고 있고, 채팅 메시지(타입 "0005")는 [1]=메시지, [2]=아이디, [6]=닉네임이다.
  *
+ * 별풍선 후원(타입 "0018", SEND_BALLOON)은 커뮤니티 라이브러리(getCurrentThread/soopapi,
+ * "실제 수집된 패킷으로 검증" 명시)의 필드 순서를 그대로 따른다 — 채팅 메시지 인덱싱과
+ * 동일한 규칙(헤더가 [0])을 적용하면 [1]=bjId, [2]=보낸사람아이디, [3]=닉네임,
+ * [4]=별풍선개수, [5]=팬순위, [6]=파일명, [7]=isDefault, [8]=열혈팬여부, [9]=TTS문구.
+ * *** 이 부분은 실제 후원 이벤트로 라이브 검증은 못 했다(문서 기반) — 채팅 참가 기능과
+ * 달리 신뢰도가 한 단계 낮으니, 실제 후원이 들어오면 한번 확인해보는 게 좋다. ***
+ *
  * 이 프로토콜은 SOOP이 언제든 바꿀 수 있는 비공식 스펙이다 — 방송사 채널로
  * 직접 검증하지 못했다면(다른 채널로만 테스트) 실제 방송에서 다시 확인이 필요하다.
  */
@@ -112,6 +119,8 @@
       const packetType = fields[0].slice(ESC.length, ESC.length + 4);
       if (packetType === "0005") {
         handleChatMessage(fields);
+      } else if (packetType === "0018") {
+        handleBalloonDonation(fields);
       }
     }
 
@@ -128,6 +137,14 @@
       }
       seenUserIds.add(userId || nickname);
       handlers.onJoin?.(nickname);
+    }
+
+    // 별풍선 후원: [3]=닉네임, [4]=개수. 문서 기반 인덱싱(라이브 미검증, 위 주석 참고).
+    function handleBalloonDonation(fields) {
+      const nickname = String(fields[3] || "").trim();
+      const amount = Number(fields[4] || 0);
+      if (!nickname || !amount) return;
+      handlers.onDonation?.({ nickname, amount });
     }
 
     return {

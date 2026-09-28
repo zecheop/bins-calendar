@@ -302,6 +302,13 @@
             </div>
 
             <p id="race-chzzk-help" class="race-chzzk-help">참가/!참가 채팅을 입력하면 자동으로 참여됩니다.</p>
+            <div class="race-panel-row race-chzzk-mode-row">
+              <select id="race-chzzk-mode" class="race-chzzk-mode-select">
+                <option value="chat" selected>채팅</option>
+                <option value="balloon">별풍선</option>
+              </select>
+              <input id="race-chzzk-cheese-ratio" type="number" min="1" step="1" value="10" class="race-chzzk-cheese-input" disabled placeholder="별풍선 개수" />
+            </div>
             <div class="race-panel-row" style="gap: 6px;">
               <input id="race-chzzk-url" type="text" class="race-chzzk-input" placeholder="https://www.sooplive.com/station/아이디" />
               <button id="race-chzzk-connect" class="race-btn-ghost race-btn-chzzk" type="button">확인</button>

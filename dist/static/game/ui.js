@@ -92,6 +92,9 @@
     const chzzkBtn = document.getElementById("race-chzzk-connect");
     const chzzkStatusEl = document.getElementById("race-chzzk-status");
     const chzzkUrlEl = document.getElementById("race-chzzk-url");
+    const chzzkModeEl = document.getElementById("race-chzzk-mode");
+    const chzzkCheeseRatioEl = document.getElementById("race-chzzk-cheese-ratio");
+    const chzzkHelpEl = document.getElementById("race-chzzk-help");
     const statTotalEl = document.getElementById("race-stat-total");
     const statAliveEl = document.getElementById("race-stat-alive");
     const statOutEl = document.getElementById("race-stat-out");
@@ -180,6 +183,24 @@
       existing.push(name);
       participantsEl.value = existing.join("\n");
       updateCountLabel();
+    }
+
+    // 후원 연동: "참가"와 달리 같은 이름(후원 닉네임)이 이미 있어도 계속
+    // 추가돼야 한다 — addParticipant의 중복 방지를 그대로 쓰면 안 돼서
+    // 별도 함수로 뒀다. 자동 배치도 타이핑 때와 동일하게 살짝 디바운스해서 반영한다.
+    function addDonationMarbles(name, count) {
+      if (!name || count < 1) return;
+      const existing = parseParticipants(participantsEl.value);
+      const room = MAX_PARTICIPANTS - existing.length;
+      const toAdd = Math.max(0, Math.min(count, room));
+      if (toAdd <= 0) return;
+      for (let i = 0; i < toAdd; i++) {
+        existing.push(name);
+      }
+      participantsEl.value = existing.join("\n");
+      updateCountLabel();
+      window.clearTimeout(autoArrangeTimer);
+      autoArrangeTimer = window.setTimeout(performArrange, 120);
     }
 
     let currentPhase = "idle";
@@ -377,9 +398,24 @@
       }
     });
 
-    // SOOP 채팅 연결 (참가/!참가로 자동 참가) — 입력창에 방송국 링크를 붙여넣고
-    // "확인"을 누르면 그 채널의 채팅에 연결된다.
-    // (SOOP은 아직 후원 연동을 검증하지 못해 채팅 참가 방식만 지원한다.)
+    // 참가 방식(채팅/별풍선)에 따라 별풍선 단가 입력 활성화 여부와 안내 문구가
+    // 바뀐다 — 두 방식을 동시에 켜두면 헷갈리니 하나만 고르게 한다.
+    function updateChzzkModeUI() {
+      const isBalloon = chzzkModeEl.value === "balloon";
+      chzzkCheeseRatioEl.disabled = !isBalloon;
+      const ratio = Math.max(1, Number(chzzkCheeseRatioEl.value) || 10);
+      chzzkHelpEl.innerHTML = isBalloon
+        ? `별풍선을 <strong>${ratio.toLocaleString()}</strong>개 이상 후원하면 참여됩니다.`
+        : "<strong>참가/!참가</strong> 채팅을 입력하면 자동으로 참여됩니다.";
+    }
+    chzzkModeEl.addEventListener("change", updateChzzkModeUI);
+    chzzkCheeseRatioEl.addEventListener("input", updateChzzkModeUI);
+    updateChzzkModeUI();
+
+    // SOOP 채팅 연결 (참가/!참가로 자동 참가, 또는 별풍선 후원으로 자동 참가) —
+    // 입력창에 방송국 링크를 붙여넣고 "확인"을 누르면 그 채널의 채팅에 연결된다.
+    // (별풍선 감지는 문서 기반 구현이라 실제 후원으로 아직 검증 못 함 —
+    // soop-chat.js 상단 주석 참고.)
     let chzzkHandle = null;
     chzzkBtn.addEventListener("click", () => {
       if (chzzkHandle) {
@@ -420,7 +456,15 @@
           }
         },
         onJoin(nickname) {
+          if (chzzkModeEl.value !== "chat") return;
           addParticipant(nickname);
+        },
+        onDonation({ nickname, amount }) {
+          if (chzzkModeEl.value !== "balloon") return;
+          const ratio = Math.max(1, Number(chzzkCheeseRatioEl?.value) || 10);
+          const count = Math.floor(amount / ratio);
+          if (count < 1) return;
+          addDonationMarbles(nickname || "후원", count);
         },
       });
     });
