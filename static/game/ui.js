@@ -1,5 +1,5 @@
 /*
- * 마블 레이스 UI 연결 — DOM 요소와 MarbleGame/MarbleChzzk/MarbleBgm API를 이어준다.
+ * 마블 레이스 UI 연결 — DOM 요소와 MarbleGame/MarbleSoop/MarbleBgm API를 이어준다.
  * 사이드 내비게이션의 "게임" 탭에서 최초 1회 initRaceUI()가 호출된다.
  */
 (function (global) {
@@ -39,16 +39,6 @@
   }
 
   let wired = false;
-
-  // 치지직 라이브 링크(예: https://chzzk.naver.com/live/3a5c68e21e1de59efc438313f908dd6f
-  // 또는 https://chzzk.naver.com/3a5c68e21e1de59efc438313f908dd6f)에서 채널 ID만 뽑아낸다.
-  // 채널 ID를 그냥 붙여넣은 경우(URL이 아닌 경우)도 그대로 통과시킨다.
-  function parseChzzkChannelId(raw) {
-    const text = String(raw || "").trim();
-    if (!text) return null;
-    const match = text.match(/([0-9a-f]{20,40})/i);
-    return match ? match[1] : null;
-  }
 
   function parseParticipants(raw) {
     const names = [];
@@ -102,9 +92,6 @@
     const chzzkBtn = document.getElementById("race-chzzk-connect");
     const chzzkStatusEl = document.getElementById("race-chzzk-status");
     const chzzkUrlEl = document.getElementById("race-chzzk-url");
-    const chzzkModeEl = document.getElementById("race-chzzk-mode");
-    const chzzkCheeseRatioEl = document.getElementById("race-chzzk-cheese-ratio");
-    const chzzkHelpEl = document.getElementById("race-chzzk-help");
     const intrusionKidnapEl = document.getElementById("race-intrusion-kidnap");
     const intrusionPunchEl = document.getElementById("race-intrusion-punch");
     const statTotalEl = document.getElementById("race-stat-total");
@@ -195,25 +182,6 @@
       existing.push(name);
       participantsEl.value = existing.join("\n");
       updateCountLabel();
-    }
-
-    // 후원 연동: "참가"와 달리 같은 이름(후원 문구)이 이미 있어도 계속
-    // 추가돼야 한다(예: "김치볶음밥" 20개) — addParticipant의 중복 방지를
-    // 그대로 쓰면 안 돼서 별도 함수로 뒀다. 자동 배치도 타이핑 때와
-    // 동일하게 살짝 디바운스해서 반영한다.
-    function addDonationMarbles(name, count) {
-      if (!name || count < 1) return;
-      const existing = parseParticipants(participantsEl.value);
-      const room = MAX_PARTICIPANTS - existing.length;
-      const toAdd = Math.max(0, Math.min(count, room));
-      if (toAdd <= 0) return;
-      for (let i = 0; i < toAdd; i++) {
-        existing.push(name);
-      }
-      participantsEl.value = existing.join("\n");
-      updateCountLabel();
-      window.clearTimeout(autoArrangeTimer);
-      autoArrangeTimer = window.setTimeout(performArrange, 120);
     }
 
     let currentPhase = "idle";
@@ -410,22 +378,9 @@
       }
     });
 
-    // 참가 방식(채팅/치즈)에 따라 치즈 단가 입력 활성화 여부와 안내 문구가
-    // 바뀐다 — 두 방식을 동시에 켜두면 헷갈리니 하나만 고르게 한다.
-    function updateChzzkModeUI() {
-      const isCheese = chzzkModeEl.value === "cheese";
-      chzzkCheeseRatioEl.disabled = !isCheese;
-      const ratio = Math.max(1, Number(chzzkCheeseRatioEl.value) || 1000);
-      chzzkHelpEl.innerHTML = isCheese
-        ? `치즈를 <strong>${ratio.toLocaleString()}</strong>개 이상 후원하면 참여됩니다.`
-        : "<strong>참가/!참가</strong> 채팅을 입력하면 자동으로 참여됩니다.";
-    }
-    chzzkModeEl.addEventListener("change", updateChzzkModeUI);
-    chzzkCheeseRatioEl.addEventListener("input", updateChzzkModeUI);
-    updateChzzkModeUI();
-
-    // CHZZK 채팅 연결 (참가/!참가로 자동 참가) — 입력창에 라이브 링크를 붙여넣고
+    // SOOP 채팅 연결 (참가/!참가로 자동 참가) — 입력창에 방송국 링크를 붙여넣고
     // "확인"을 누르면 그 채널의 채팅에 연결된다.
+    // (SOOP은 아직 후원 연동을 검증하지 못해 채팅 참가 방식만 지원한다.)
     let chzzkHandle = null;
     chzzkBtn.addEventListener("click", () => {
       if (chzzkHandle) {
@@ -437,15 +392,15 @@
         chzzkStatusEl.classList.remove("is-live");
         return;
       }
-      const channelId = parseChzzkChannelId(chzzkUrlEl.value);
-      if (!channelId) {
-        chzzkStatusEl.textContent = "올바른 치지직 라이브 링크를 입력하세요";
+      const bjid = global.MarbleSoop.parseSoopBjId(chzzkUrlEl.value);
+      if (!bjid) {
+        chzzkStatusEl.textContent = "올바른 SOOP 방송국 링크를 입력하세요";
         chzzkStatusEl.classList.remove("is-live");
         return;
       }
       chzzkStatusEl.textContent = "연결 중...";
       chzzkUrlEl.disabled = true;
-      chzzkHandle = global.MarbleChzzk.connect(channelId, {
+      chzzkHandle = global.MarbleSoop.connect(bjid, {
         onStatus(status, message, info) {
           if (status === "connected") {
             // 어떤 방송에 연결됐는지 유저가 확인할 수 있게 채널명/방송 제목을 보여준다.
@@ -466,18 +421,7 @@
           }
         },
         onJoin(nickname) {
-          if (chzzkModeEl.value !== "chat") return;
           addParticipant(nickname);
-        },
-        onDonation({ nickname, message, amount }) {
-          if (chzzkModeEl.value !== "cheese") return;
-          const ratio = Math.max(1, Number(chzzkCheeseRatioEl?.value) || 1000);
-          const count = Math.floor(amount / ratio);
-          if (count < 1) return;
-          // 후원 문구가 핀볼 이름이 된다(요청사항) — 문구가 비어있으면
-          // 닉네임으로, 그것도 없으면(익명+문구없음) "후원"으로 대체한다.
-          const name = message || nickname || "후원";
-          addDonationMarbles(name, count);
         },
       });
     });

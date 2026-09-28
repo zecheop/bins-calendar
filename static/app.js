@@ -5504,7 +5504,7 @@ const GAME_SCRIPT_SRCS = [
   ["/static/game/camera.js"],
   ["/static/game/renderer.js"],
   ["/static/game/marble-race.js"],
-  ["/static/game/chzzk-chat.js"],
+  ["/static/game/soop-chat.js"],
   ["/static/game/bgm.js"],
   ["/static/game/ui.js"],
 ];

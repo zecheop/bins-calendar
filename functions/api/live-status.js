@@ -1,5 +1,6 @@
-// 빈스는 치지직이 아니라 SOOP에서 방송하므로 CHZZK_CHANNEL_ID를 비워둠(라이브 상태는 항상 fallback으로 처리됨).
-const DEFAULT_CHANNEL_ID = "";
+const DEFAULT_BJID = "psb010203";
+const DEFAULT_STATION_URL = "https://www.sooplive.com/station/psb010203";
+const SOOP_LIVE_API_URL = "https://live.afreecatv.com/afreeca/player_live_api.php";
 // TODO: 빈스 캘린더용 Firebase 프로젝트를 새로 만든 뒤 그 프로젝트 ID로 교체
 const DEFAULT_PROJECT_ID = "";
 const DEFAULT_CALENDAR_COLLECTION = "calendar_overrides";
@@ -10,20 +11,11 @@ const DEFAULT_PROFILE = {
   bio: "알다가도 모를 까마귀",
 };
 
-function parseKstDateTime(value) {
-  const text = String(value || "").trim();
-  if (!text) {
-    return "";
-  }
-  const normalized = text.replace(" ", "T");
-  return `${normalized}+09:00`;
-}
-
 function fallbackPayload(channelId, message) {
   return {
     channelId,
     channelName: DEFAULT_PROFILE.channelName,
-    channelUrl: `https://chzzk.naver.com/${channelId}`,
+    channelUrl: DEFAULT_STATION_URL,
     avatarUrl: "",
     bio: DEFAULT_PROFILE.bio,
     followerCount: 0,
@@ -313,46 +305,61 @@ async function syncAutoLiveStatus(context, livePayload) {
   };
 }
 
+// SOOP(구 아프리카TV)의 비공식 플레이어 API 호출. BTIME은 절대시각이 아니라
+// "방송 시작 후 경과 초"라서, 시작 시각은 지금 시각에서 그만큼 빼서 계산한다.
+// (static/game/soop-chat.js 상단 주석에 이 API의 검증 경위를 적어뒀다.)
 export async function onRequestGet(context) {
-  const channelId = String(context.env?.CHZZK_CHANNEL_ID || DEFAULT_CHANNEL_ID).trim() || DEFAULT_CHANNEL_ID;
-  const baseUrl = "https://api.chzzk.naver.com";
+  const bjid = String(context.env?.SOOP_BJID || DEFAULT_BJID).trim() || DEFAULT_BJID;
   const requestUrl = new URL(context.request.url);
   const debugAutoSync = requestUrl.searchParams.get("debugAutoSync") === "1";
-  const headers = {
-    "User-Agent": "Mozilla/5.0",
-    Accept: "application/json",
-  };
 
   try {
-    const [channelResponse, liveResponse] = await Promise.all([
-      fetch(`${baseUrl}/service/v1/channels/${channelId}`, { headers }),
-      fetch(`${baseUrl}/service/v2/channels/${channelId}/live-detail`, { headers }),
-    ]);
+    const body = new URLSearchParams({
+      bid: bjid,
+      bno: "",
+      type: "live",
+      confirm_adult: "false",
+      player_type: "html5",
+      mode: "landing",
+      from_api: "0",
+      pwd: "",
+      stream_type: "common",
+      quality: "HD",
+    });
+    const liveResponse = await fetch(`${SOOP_LIVE_API_URL}?bjid=${encodeURIComponent(bjid)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0",
+      },
+      body: body.toString(),
+    });
 
-    if (!channelResponse.ok || !liveResponse.ok) {
-      return Response.json(fallbackPayload(channelId, "치지직 상태를 잠시 확인하지 못했습니다."));
+    if (!liveResponse.ok) {
+      return Response.json(fallbackPayload(bjid, "방송 상태를 잠시 확인하지 못했습니다."));
     }
 
-    const channelPayload = (await channelResponse.json()).content || {};
-    const livePayload = (await liveResponse.json()).content || {};
+    const channelPayload = (await liveResponse.json())?.CHANNEL || {};
+    const isLive = Number(channelPayload.RESULT || 0) === 1;
+    let startAt = "";
+    if (isLive) {
+      const elapsedSeconds = Number(channelPayload.BTIME || 0) || 0;
+      startAt = new Date(Date.now() - elapsedSeconds * 1000).toISOString();
+    }
+
     const responsePayload = {
-      channelId,
-      channelName:
-        String(channelPayload.channelName || "").trim() ||
-        String(livePayload.channel?.channelName || "").trim() ||
-        DEFAULT_PROFILE.channelName,
-      channelUrl: `https://chzzk.naver.com/${channelId}`,
-      avatarUrl:
-        String(channelPayload.channelImageUrl || "").trim() ||
-        String(livePayload.channel?.channelImageUrl || "").trim(),
-      bio: String(channelPayload.channelDescription || "").trim() || DEFAULT_PROFILE.bio,
-      followerCount: Number(channelPayload.followerCount || 0) || 0,
-      isLive: Boolean(channelPayload.openLive),
-      liveTitle: String(livePayload.liveTitle || "").trim(),
-      startAt: parseKstDateTime(livePayload.openDate),
-      closeAt: parseKstDateTime(livePayload.closeDate),
-      lastStartAt: parseKstDateTime(livePayload.openDate),
-      lastCloseAt: parseKstDateTime(livePayload.closeDate),
+      channelId: bjid,
+      channelName: String(channelPayload.BJNICK || "").trim() || DEFAULT_PROFILE.channelName,
+      channelUrl: DEFAULT_STATION_URL,
+      avatarUrl: "",
+      bio: DEFAULT_PROFILE.bio,
+      followerCount: 0,
+      isLive,
+      liveTitle: String(channelPayload.TITLE || "").trim(),
+      startAt,
+      closeAt: "",
+      lastStartAt: startAt,
+      lastCloseAt: "",
       available: true,
       stale: false,
       message: "",
@@ -373,6 +380,6 @@ export async function onRequestGet(context) {
 
     return Response.json(responsePayload);
   } catch {
-    return Response.json(fallbackPayload(channelId, "치지직 상태를 잠시 확인하지 못했습니다."));
+    return Response.json(fallbackPayload(bjid, "방송 상태를 잠시 확인하지 못했습니다."));
   }
 }

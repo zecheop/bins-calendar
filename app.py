@@ -77,11 +77,11 @@ SPREADSHEET_EXPORT_URL = (
     or (f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=xlsx" if SPREADSHEET_ID else "")
 )
 GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
-# 빈스는 치지직이 아니라 SOOP(숲)에서 방송하므로 치지직 라이브 상태 연동은 아직 없음.
-# CHZZK_CHANNEL_ID를 비워두면 fetch_chzzk_live_status()가 실패해도
-# fallback_live_status()로 안전하게 넘어가도록 이미 되어 있음(app.py 기존 로직).
+# 빈스는 치지직이 아니라 SOOP(숲)에서 방송함.
 CHZZK_CHANNEL_ID = os.getenv("CHZZK_CHANNEL_ID", "").strip()
+SOOP_BJID = os.getenv("SOOP_BJID", "psb010203").strip()
 SOOP_STATION_URL = os.getenv("SOOP_STATION_URL", "https://www.sooplive.com/station/psb010203").strip()
+SOOP_LIVE_API_URL = "https://live.afreecatv.com/afreeca/player_live_api.php"
 YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "UCXoZBh4NsEHDDzpkqCHGGdA").strip()
 YOUTUBE_CHANNEL_URL = os.getenv(
     "YOUTUBE_CHANNEL_URL",
@@ -977,6 +977,10 @@ def format_live_start_badge(start_at: datetime) -> str:
 def maybe_capture_live_start(live_payload: dict[str, Any]) -> None:
     if not live_payload.get("isLive") or not live_payload.get("startAt"):
         return
+    # 스프레드시트가 아직 없는 채널(예: 빈스)은 시트 기반 캘린더 동기화 자체가
+    # 불가능하므로, 여기서 조용히 건너뛴다(에디터가 수동으로 일정을 등록한다).
+    if not SPREADSHEET_EXPORT_URL:
+        return
 
     try:
         start_at = datetime.fromisoformat(str(live_payload["startAt"])).astimezone(TIMEZONE)
@@ -1014,37 +1018,51 @@ def maybe_capture_live_start(live_payload: dict[str, Any]) -> None:
     )
 
 
-def fetch_chzzk_live_status() -> dict[str, Any]:
-    channel_url = f"{CHZZK_API_BASE}/service/v1/channels/{CHZZK_CHANNEL_ID}"
-    live_url = f"{CHZZK_API_BASE}/service/v2/channels/{CHZZK_CHANNEL_ID}/live-detail"
-    channel_payload = http_session.get(channel_url, timeout=REQUEST_TIMEOUT).json().get("content", {})
-    live_payload = http_session.get(live_url, timeout=REQUEST_TIMEOUT).json().get("content", {})
+def fetch_soop_live_status() -> dict[str, Any]:
+    # SOOP(구 아프리카TV)의 비공식 플레이어 API. 공식 문서는 없고, 이 엔드포인트가
+    # 방송 중 여부·제목·채팅 서버 정보를 담아 돌려준다는 것은 커뮤니티 역공학으로
+    # 확인된 내용이다(static/game/soop-chat.js 참고). BTIME은 절대시각이 아니라
+    # "방송 시작 후 경과 초"라서, 시작 시각은 지금 시각에서 그만큼 빼서 계산한다.
+    response = http_session.post(
+        f"{SOOP_LIVE_API_URL}?bjid={SOOP_BJID}",
+        data={
+            "bid": SOOP_BJID,
+            "bno": "",
+            "type": "live",
+            "confirm_adult": "false",
+            "player_type": "html5",
+            "mode": "landing",
+            "from_api": "0",
+            "pwd": "",
+            "stream_type": "common",
+            "quality": "HD",
+        },
+        timeout=REQUEST_TIMEOUT,
+    )
+    channel_payload = response.json().get("CHANNEL", {})
+    live_now = int(channel_payload.get("RESULT") or 0) == 1
 
-    live_now = bool(channel_payload.get("openLive"))
-    open_date_raw = normalize_text(live_payload.get("openDate"))
-    close_date_raw = normalize_text(live_payload.get("closeDate"))
-
-    def parse_kst(value: str) -> str:
-        if not value:
-            return ""
+    start_at = ""
+    if live_now:
         try:
-            return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TIMEZONE).isoformat()
-        except ValueError:
-            return ""
+            elapsed_seconds = int(channel_payload.get("BTIME") or 0)
+            start_at = (now_kst() - timedelta(seconds=elapsed_seconds)).isoformat()
+        except (TypeError, ValueError):
+            start_at = ""
 
     payload = {
-        "channelId": CHZZK_CHANNEL_ID,
-        "channelName": normalize_text(channel_payload.get("channelName")) or normalize_text(live_payload.get("channel", {}).get("channelName")) or "빈스",
+        "channelId": SOOP_BJID,
+        "channelName": normalize_text(channel_payload.get("BJNICK")) or "빈스",
         "channelUrl": SOOP_STATION_URL,
-        "avatarUrl": normalize_text(channel_payload.get("channelImageUrl")) or normalize_text(live_payload.get("channel", {}).get("channelImageUrl")),
-        "bio": normalize_text(channel_payload.get("channelDescription")) or "알다가도 모를 까마귀",
-        "followerCount": int(channel_payload.get("followerCount") or 0),
+        "avatarUrl": "",
+        "bio": "알다가도 모를 까마귀",
+        "followerCount": 0,
         "isLive": live_now,
-        "liveTitle": normalize_text(live_payload.get("liveTitle")),
-        "startAt": parse_kst(open_date_raw),
-        "closeAt": parse_kst(close_date_raw),
-        "lastStartAt": parse_kst(open_date_raw),
-        "lastCloseAt": parse_kst(close_date_raw),
+        "liveTitle": normalize_text(channel_payload.get("TITLE")),
+        "startAt": start_at,
+        "closeAt": "",
+        "lastStartAt": start_at,
+        "lastCloseAt": "",
         "available": True,
         "stale": False,
         "message": "",
@@ -1058,7 +1076,7 @@ def fetch_chzzk_live_status() -> dict[str, Any]:
 
 def fallback_live_status(message: str, stale: bool = False) -> dict[str, Any]:
     return {
-        "channelId": CHZZK_CHANNEL_ID,
+        "channelId": SOOP_BJID,
         "channelName": "빈스",
         "channelUrl": SOOP_STATION_URL,
         "avatarUrl": "",
@@ -1078,16 +1096,16 @@ def fallback_live_status(message: str, stale: bool = False) -> dict[str, Any]:
 
 def get_live_status_payload() -> dict[str, Any]:
     try:
-        return fetch_chzzk_live_status()
+        return fetch_soop_live_status()
     except Exception:
         with live_status_lock:
             cached = live_status_cache.get("data")
         if cached:
             stale_payload = dict(cached)
             stale_payload["stale"] = True
-            stale_payload["message"] = "치지직 상태를 잠시 다시 확인하는 중입니다."
+            stale_payload["message"] = "방송 상태를 잠시 다시 확인하는 중입니다."
             return stale_payload
-        return fallback_live_status("치지직 상태를 잠시 확인하지 못했습니다.")
+        return fallback_live_status("방송 상태를 잠시 확인하지 못했습니다.")
 
 
 def normalize_cafe_article_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
