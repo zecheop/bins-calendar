@@ -92,8 +92,6 @@
     const chzzkBtn = document.getElementById("race-chzzk-connect");
     const chzzkStatusEl = document.getElementById("race-chzzk-status");
     const chzzkUrlEl = document.getElementById("race-chzzk-url");
-    const intrusionKidnapEl = document.getElementById("race-intrusion-kidnap");
-    const intrusionPunchEl = document.getElementById("race-intrusion-punch");
     const statTotalEl = document.getElementById("race-stat-total");
     const statAliveEl = document.getElementById("race-stat-alive");
     const statOutEl = document.getElementById("race-stat-out");
@@ -334,9 +332,10 @@
       resetRecentOutList();
       global.MarbleGame.setSpeed(Number(speedEl.value) || 1);
       global.MarbleGame.start(names, {
+        // 빈스 캘린더용 캐릭터 아트(납치/펀치 난입 이미지)가 없어서 두 효과 모두 끔.
         intrusionEffects: {
-          kidnap: intrusionKidnapEl?.checked ?? true,
-          punch: intrusionPunchEl?.checked ?? true,
+          kidnap: false,
+          punch: false,
         },
       });
     });

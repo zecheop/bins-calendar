@@ -290,13 +290,10 @@
     return cached.img;
   }
 
-  // 난입이 실제로 발동된 순간에야 이미지를 불러오기 시작하면, 로드가 끝나기
-  // 전 몇 프레임 동안 이모지 대체 화면이 먼저 보이는 버그가 있었다 —
-  // 스크립트가 로드되자마자 미리 불러와서 실제 발동 시점엔 항상 캐시돼
-  // 있게 한다.
-  for (const key of Object.keys(INTRUSION_EFFECTS)) {
-    INTRUSION_EFFECTS[key].frames.forEach((_, frameIndex) => getEffectFrameImage(key, frameIndex));
-  }
+  // 빈스 캘린더는 납치/펀치 난입 효과를 항상 꺼둔 상태라(캐릭터 아트가 없음)
+  // 어차피 그려질 일이 없는 이미지를 미리 받아올 필요가 없다 — 원래 있던
+  // 즉시 preload 로직은 제거하고, getEffectFrameImage가 실제로 그려질 때만
+  // (지금은 절대 없음) 지연 로드하도록 둔다.
 
   // 등장(0~0.35) -> 유지/타격(0.35~0.65) -> 퇴장(0.65~1) 3단계로 위에서
   // 슬라이드되어 들어왔다 나가는 캐릭터 + 배너 텍스트를 그린다.
