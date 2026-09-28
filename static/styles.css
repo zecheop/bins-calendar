@@ -222,12 +222,14 @@ body[data-theme="dark"] .side-nav {
   font-family: "Noto Sans KR", "Noto Sans", sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
 }
 
 .side-nav-item svg {
   width: 21px;
   height: 21px;
   stroke: currentColor;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
   fill: none;
   stroke-width: 1.6;
   stroke-linecap: round;
