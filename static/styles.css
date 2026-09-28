@@ -264,6 +264,11 @@ body[data-theme="dark"] .side-nav {
   margin-left: 100px;
 }
 
+.hero {
+  margin-left: -100px;
+  width: calc(100% + 100px);
+}
+
 .brand-mark {
   font-family: "Gugi", "Noto Sans", sans-serif;
   font-size: clamp(1rem, 1.35vw, 1.12rem);
@@ -5120,6 +5125,11 @@ body[data-theme="dark"] .version-history-preview-change {
   .main-with-nav {
     margin-left: 0;
     padding-bottom: 64px;
+  }
+
+  .hero {
+    margin-left: 0;
+    width: 100%;
   }
 
   .visit-counter {
