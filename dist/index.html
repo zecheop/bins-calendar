@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta id="viewport-meta" name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>빈스 캘린더</title>
+  <meta name="description" content="빈스 스트리머의 일정, 방송 상태, 최신 영상, 노래책을 한곳에서 보는 개인 캘린더">
+  <link rel="icon" type="image/png" href="/static/assets/vince-profile.webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dongle:wght@400;700&family=Edu+VIC+WA+NT+Hand:wght@400..700&family=Gugi&family=Noto+Sans:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=2026-09-28-1">
+</head>
+<body data-theme="light">
+  <div class="page-glow" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand-block"></div>
+    <div class="top-actions">
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="테마 전환">☾</button>
+      <div id="auth-status" class="auth-chip hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+      <button id="google-signin" class="ghost-button top-auth-button top-auth-button-google hidden" type="button">
+        <svg class="google-signin-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.5 0-.72-.06-1.41-.19-2.08z"/>
+          <path fill="#34A853" d="M12 22c2.75 0 5.05-.91 6.73-2.47l-3.3-2.56c-.91.61-2.08.98-3.43.98-2.64 0-4.88-1.78-5.68-4.18l-3.41 2.63A10.16 10.16 0 0 0 12 22z"/>
+          <path fill="#4A90E2" d="M6.32 13.77A6.1 6.1 0 0 1 6 12c0-.61.11-1.2.32-1.77L2.91 7.6A10.16 10.16 0 0 0 1.8 12c0 1.64.39 3.19 1.11 4.4z"/>
+          <path fill="#FBBC05" d="M12 6.05c1.5 0 2.84.52 3.9 1.54l2.92-2.92C17.04 2.98 14.74 2 12 2A10.16 10.16 0 0 0 2.91 7.6l3.41 2.63C7.12 7.83 9.36 6.05 12 6.05z"/>
+        </svg>
+        <span>로그인</span>
+      </button>
+      <button id="logout-button" class="ghost-button top-auth-button hidden" type="button">로그아웃</button>
+    </div>
+  </header>
+
+  <nav class="side-nav" id="side-nav">
+    <button class="side-nav-item is-active" data-nav="home" type="button" aria-label="홈">
+      <svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9"/></svg>
+      <span>홈</span>
+    </button>
+    <button class="side-nav-item" data-nav="calendar" type="button" aria-label="일정">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="2.4"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg>
+      <span>일정</span>
+    </button>
+    <button class="side-nav-item" data-nav="songbook" type="button" aria-label="노래책">
+      <svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>
+      <span>노래책</span>
+    </button>
+    <button class="side-nav-item" data-nav="game" type="button" aria-label="게임">
+      <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="5"/><path d="M7 12h3M8.5 10.5v3"/><circle cx="15" cy="11" r="1"/><circle cx="17.5" cy="13.5" r="1"/></svg>
+      <span>게임</span>
+    </button>
+  </nav>
+
+  <main class="main-with-nav">
+    <section class="hero" id="hero">
+      <video class="hero-video" id="hero-video" autoplay muted playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
+      <video class="hero-video hero-video-buffer" id="hero-video-buffer" muted playsinline preload="auto" aria-hidden="true"></video>
+      <img class="hero-image" id="hero-image" src="/static/assets/vince-hero-crow-fight.jpg" alt="빈스 캘린더 표지 이미지">
+      <div class="hero-scrim"></div>
+      <div class="hero-aura" aria-hidden="true"></div>
+      <div class="hero-content">
+        <h1><span>빈스</span><span>캘린더</span></h1>
+        <div class="hero-actions hidden">
+          <button id="open-current-month" class="hero-link" type="button">일정 보기</button>
+          <button id="open-songbook-hero" class="hero-secondary-link" type="button">노래책</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="viewer-shell" class="viewer-shell hidden">
+      <div class="viewer-board">
+        <aside class="viewer-left">
+          <section class="profile-card">
+            <img id="profile-avatar-mini" class="profile-avatar" src="/static/assets/vince-profile.webp" alt="빈스 프로필">
+            <h2 id="profile-name">빈스</h2>
+            <p id="profile-bio" class="profile-bio">알다가도 모를 까마귀</p>
+
+            <div class="service-row">
+              <a id="chzzk-link" class="service-link" target="_blank" rel="noreferrer" aria-label="SOOP">
+                <img class="service-icon" src="/static/assets/soop-app.png" alt="">
+              </a>
+              <a id="youtube-link" class="service-link service-link-youtube" target="_blank" rel="noreferrer" aria-label="유튜브">
+                <svg class="service-icon service-icon-youtube" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M23.5 7.2a3 3 0 0 0-2.1-2.1C19.4 4.5 12 4.5 12 4.5s-7.4 0-9.4.6A3 3 0 0 0 .5 7.2 31.7 31.7 0 0 0 0 12a31.7 31.7 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c2 .6 9.4.6 9.4.6s7.4 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.7 31.7 0 0 0 24 12a31.7 31.7 0 0 0-.5-4.8M9.6 15.7V8.3L16 12z"/>
+                </svg>
+              </a>
+              <a id="cafe-link" class="service-link service-link-cafe" target="_blank" rel="noreferrer" aria-label="팬카페">
+                <img class="service-icon" src="/static/assets/cafe-app.webp" alt="">
+              </a>
+            </div>
+          </section>
+
+          <div class="viewer-left-secondary">
+            <section class="status-card status-card-compact">
+              <div class="status-top">
+                <span id="live-pill" class="live-pill offline">OFFLINE</span>
+                <a
+                  class="status-live-link"
+                  href="https://www.sooplive.com/station/psb010203"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="SOOP 생방 바로가기"
+                  title="SOOP 생방 바로가기"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+                    <path d="M9 15 15 9" />
+                    <path d="M10 9h5v5" />
+                  </svg>
+                </a>
+              </div>
+              <p id="live-summary" class="status-copy">방송 상태 확인 중</p>
+            </section>
+
+            <aside class="postit-card postit-card-side">
+              <div class="postit-tape" aria-hidden="true"></div>
+              <div class="postit-head">
+                <h3>빈스 한마디</h3>
+              </div>
+              <div id="postit-items" class="postit-items"></div>
+            </aside>
+
+            <aside class="countdown-card countdown-card-side">
+              <div id="countdown-items" class="countdown-items"></div>
+            </aside>
+
+          </div>
+        </aside>
+
+        <section class="viewer-content">
+          <div class="viewer-main-grid">
+            <section class="calendar-card">
+              <div class="calendar-head">
+                <div class="calendar-nav-wrap">
+                  <div class="calendar-nav">
+                    <button id="year-prev" class="icon-button icon-button-small" type="button" aria-label="이전 연도">‹</button>
+                    <h2 id="year-title">2026년</h2>
+                    <button id="year-next" class="icon-button icon-button-small" type="button" aria-label="다음 연도">›</button>
+                  </div>
+                  <div class="calendar-nav">
+                    <button id="month-prev" class="icon-button icon-button-small" type="button" aria-label="이전 월">‹</button>
+                    <h2 id="month-title">07월</h2>
+                    <button id="month-next" class="icon-button icon-button-small" type="button" aria-label="다음 월">›</button>
+                  </div>
+                </div>
+                <a
+                  id="cafe-notice-link"
+                  class="calendar-notice-link hidden"
+                  href="#"
+                  target="_blank"
+                  rel="noreferrer"
+                ></a>
+                <div class="calendar-head-actions">
+                  <button
+                    id="version-history-trigger"
+                    class="calendar-version-trigger hidden"
+                    type="button"
+                    aria-label="버전 기록"
+                    title="버전 기록"
+                  >버전 기록</button>
+                  <button
+                    id="mobile-view-toggle"
+                    class="mobile-view-toggle"
+                    type="button"
+                    aria-label="월간 전체보기 전환"
+                    title="월간 전체보기 전환"
+                  >월간</button>
+                  <button
+                    id="calendar-search-trigger"
+                    class="calendar-search-trigger"
+                    type="button"
+                    aria-label="일정 검색"
+                    title="일정 검색"
+                  >🔍</button>
+                </div>
+              </div>
+
+              <div id="mobile-day-view" class="mobile-day-view" aria-live="polite"></div>
+              <div id="mobile-month-view" class="mobile-month-view hidden" aria-live="polite"></div>
+
+              <div class="weekday-row">
+                <span class="weekday-sun">일</span>
+                <span>월</span>
+                <span>화</span>
+                <span>수</span>
+                <span>목</span>
+                <span>금</span>
+                <span class="weekday-sat">토</span>
+              </div>
+
+              <div id="calendar-grid" class="calendar-grid"></div>
+              <div class="calendar-bottom">
+                <div id="legend" class="legend-list legend-list-inline legend-list-compact"></div>
+                <p class="calendar-footnote">실시간 방송 일정은 변동될 수 있습니다.</p>
+              </div>
+            </section>
+          </div>
+
+        <section class="widget-card viewer-youtube">
+          <div id="youtube-cards" class="youtube-cards"></div>
+        </section>
+      </section>
+      </div>
+    </section>
+
+    <section id="songbook-shell" class="songbook-shell hidden">
+      <div class="songbook-board">
+        <div class="songbook-head">
+          <div>
+            <p class="songbook-kicker">VINCE SONGBOOK</p>
+            <h2>빈스의 노래책</h2>
+          </div>
+        <div class="songbook-head-actions">
+          <button id="song-search-reset" class="song-random-button song-search-reset-button hidden" type="button">↺ <span class="song-search-reset-label">되돌리기</span></button>
+          <button id="song-search" class="song-random-button song-search-button" type="button">곡 검색</button>
+          <button id="song-random" class="song-random-button" type="button">Random</button>
+        </div>
+        </div>
+
+        <form id="songbook-editor" class="songbook-editor hidden">
+          <input id="song-title-input" type="text" maxlength="120" placeholder="곡명">
+          <input id="song-original-title-input" type="text" maxlength="120" placeholder="원곡명">
+          <input id="song-artist-input" type="text" maxlength="80" placeholder="아티스트">
+          <input id="song-tag-input" data-song-tag-field type="text" maxlength="180" list="song-tag-suggestions" placeholder="태그(쉼표로 구분)">
+          <select id="song-category-input"></select>
+          <button id="song-add-button" class="ghost-button ghost-button-compact" type="submit">추가</button>
+          <p id="song-editor-status" class="song-editor-status" aria-live="polite"></p>
+        </form>
+
+        <div id="song-undo-bar" class="song-undo-bar hidden">
+          <button id="song-undo-close" class="song-undo-close" type="button" aria-label="닫기">×</button>
+          <span id="song-undo-text">삭제됨</span>
+          <button id="song-undo-button" class="song-undo-button" type="button">되돌리기</button>
+        </div>
+
+        <section class="songbook-table-card">
+          <div id="song-tag-filter-bar" class="song-tag-filter-bar"></div>
+          <div class="song-table-head">
+            <span>번호</span>
+            <span>곡명</span>
+            <span>원곡명</span>
+            <span>아티스트</span>
+            <span>분류</span>
+            <span>태그</span>
+          </div>
+          <div id="song-results" class="song-results song-table"></div>
+          <div id="song-pagination" class="song-pagination hidden" aria-label="노래책 페이지 이동"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="game-shell" class="game-shell hidden">
+      <div class="game-board">
+        <div class="game-head">
+          <div></div>
+          <div class="game-head-actions">
+            <button id="game-log-toggle" class="game-bgm-toggle" type="button">역대 기록</button>
+            <button id="game-bgm-toggle" class="game-bgm-toggle" type="button" aria-pressed="false">BGM</button>
+            <div id="game-bgm-panel" class="game-bgm-panel hidden">
+              <button id="game-bgm-play" class="game-bgm-icon-btn" type="button" aria-label="재생">▶</button>
+              <button id="game-bgm-mute" class="game-bgm-icon-btn" type="button" aria-label="음소거">🔊</button>
+              <input id="game-bgm-volume" type="range" min="0" max="100" value="60" aria-label="볼륨">
+            </div>
+            <div id="game-bgm-mount" class="game-bgm-mount" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div class="race-layout">
+          <div class="race-stage" id="race-stage">
+            <canvas id="race-canvas"></canvas>
+            <div id="race-game-loading" class="race-game-loading">게임을 불러오는 중...</div>
+
+            <div class="race-hud">
+              <span id="race-phase-label" class="race-phase-label">참가자를 입력하세요</span>
+              <span class="race-hud-right">
+                <span id="race-alive-tag" class="race-alive-tag hidden"></span>
+                <span id="race-leader-tag" class="race-leader-tag hidden"></span>
+              </span>
+            </div>
+
+            <button id="race-fullscreen" class="race-fullscreen-btn" type="button" aria-label="전체화면" title="전체화면">⤢</button>
+
+            <div id="race-winner-reveal" class="race-winner-reveal hidden">
+              <div id="race-confetti" class="race-confetti"></div>
+              <span class="race-winner-crown">🏆</span>
+              <p class="race-winner-label">우승</p>
+              <p id="race-winner-name" class="race-winner-name"></p>
+              <button id="race-winner-next" class="race-btn" type="button">다음</button>
+            </div>
+
+            <div id="race-results" class="race-results hidden">
+              <p class="race-results-title">최종 결과</p>
+              <ol id="race-results-list" class="race-results-list"></ol>
+              <button id="race-restart" class="race-btn" type="button">다시 시작</button>
+            </div>
+          </div>
+
+          <aside class="race-panel">
+            <div class="race-panel-row" style="align-items: center; gap: 8px; margin-bottom: 10px;">
+              <label class="race-panel-label" for="race-stage-select" style="margin: 0; white-space: nowrap;">맵</label>
+              <select id="race-stage-select" style="flex: 1; padding: 6px 8px; font-size: 13px; border-radius: 8px;"></select>
+            </div>
+
+            <p id="race-chzzk-help" class="race-chzzk-help">참가/!참가 채팅을 입력하면 자동으로 참여됩니다.</p>
+            <div class="race-panel-row" style="gap: 6px;">
+              <input id="race-chzzk-url" type="text" class="race-chzzk-input" placeholder="https://www.sooplive.com/station/아이디" />
+              <button id="race-chzzk-connect" class="race-btn-ghost race-btn-chzzk" type="button">확인</button>
+            </div>
+            <span id="race-chzzk-status" class="race-chzzk-status"></span>
+
+            <label class="race-panel-label" for="race-participants">참가자 <span id="race-count-label" class="race-count-tag">0명</span> · 줄바꿈 또는 쉼표로 구분</label>
+            <textarea id="race-participants" class="race-textarea" rows="5" placeholder="빈스&#10;까마귀&#10;참가자3"></textarea>
+            <div class="race-panel-row race-panel-row-big">
+              <button id="race-shuffle" class="race-btn-ghost race-btn-big" type="button">섞기</button>
+              <button id="race-clear" class="race-btn-ghost race-btn-big" type="button">초기화</button>
+            </div>
+            <button id="race-arrange" class="race-btn-ghost race-btn-big race-btn-full" type="button">배치</button>
+            <button id="race-start" class="race-btn race-btn-big race-btn-full" type="button">시작</button>
+
+            <div class="race-panel-row race-speed-row">
+              <span>속도</span>
+              <input id="race-speed" type="range" min="0.5" max="2.5" step="0.1" value="1">
+              <span id="race-speed-value">1.0×</span>
+            </div>
+
+            <div class="race-intrusion-conditions">
+              <p class="race-panel-label race-intrusion-label">난입 조건</p>
+              <div class="race-intrusion-options">
+                <label class="race-intrusion-toggle">
+                  <input id="race-intrusion-kidnap" type="checkbox" checked />
+                  <span>납치 사용</span>
+                </label>
+                <label class="race-intrusion-toggle">
+                  <input id="race-intrusion-punch" type="checkbox" checked />
+                  <span>펀치 사용</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="race-panel-stats">
+              <span>전체 <b id="race-stat-total">0</b></span>
+              <span>생존 <b id="race-stat-alive">0</b></span>
+              <span>탈락 <b id="race-stat-out">0</b></span>
+            </div>
+
+            <div class="race-recent-out">
+              <p class="race-recent-out-label">최근 탈락</p>
+              <ol id="race-recent-out-list" class="race-recent-out-list"></ol>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <div id="game-log-modal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="game-log-title">
+      <div class="note-dialog" tabindex="-1">
+        <div class="note-head">
+          <h3 id="game-log-title">역대 핀볼 기록</h3>
+          <button id="game-log-close" class="ghost-button ghost-button-compact" type="button">닫기</button>
+        </div>
+        <div id="game-log-list" class="game-log-list">
+          <p class="game-log-empty">불러오는 중...</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="editor-modal" class="editor-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <section id="editor-panel" class="editor-panel" tabindex="-1">
+        <div class="editor-head">
+          <button id="editor-close" class="editor-close-button" type="button" aria-label="일정 편집 닫기">×</button>
+          <h3 id="editor-title">2026년 07월 01일</h3>
+        </div>
+        <form id="editor-form" class="editor-form">
+          <div class="editor-inline-fields">
+            <label>
+              <span>📺 방송 상태</span>
+              <select id="editor-status-mode">
+                <option value="live">방송 있음</option>
+                <option value="off">휴뱅</option>
+                <option value="none">표시 안 함</option>
+              </select>
+            </label>
+            <label id="editor-time-field">
+              <span>🕘 방송 시간</span>
+              <div class="editor-time-grid">
+                <select id="editor-time-period">
+                  <option value="AM">오전</option>
+                  <option value="PM">오후</option>
+                </select>
+                <input id="editor-time-hour" type="text" inputmode="numeric" maxlength="2" placeholder="시">
+                <input id="editor-time-minute" type="text" inputmode="numeric" maxlength="2" placeholder="분">
+              </div>
+            </label>
+          </div>
+          <label class="editor-day-note">
+            <span class="editor-field-title">날짜 메모</span>
+            <textarea id="editor-day-note" rows="1" maxlength="1200"></textarea>
+          </label>
+          <div class="editor-day-image">
+            <div class="editor-day-image-head">
+              <span class="editor-field-title">날짜 이미지</span>
+              <button id="editor-day-image-remove" class="editor-day-image-remove hidden" type="button">이미지 지우기</button>
+            </div>
+            <div class="editor-day-image-row">
+              <label class="editor-day-image-picker" for="editor-day-image-input">
+                <span>이미지 올리기</span>
+                <input id="editor-day-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              </label>
+              <span class="editor-day-image-help">(최적 해상도 : 640*640)</span>
+            </div>
+            <div id="editor-day-image-preview" class="editor-day-image-preview hidden"></div>
+          </div>
+          <div class="slot-list" id="slot-list"></div>
+          <p id="save-status" class="save-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </form>
+      </section>
+    </div>
+
+    <div id="editor-close-warning-modal" class="song-random-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editor-close-warning-title">
+      <div class="song-random-dialog editor-close-warning-dialog" tabindex="-1">
+        <h3 id="editor-close-warning-title">방송 있음 - 시간이 입력되지 않았습니다</h3>
+        <div class="editor-close-warning-actions">
+          <button id="editor-close-warning-cancel" class="calendar-search-reset" type="button">계속 입력</button>
+          <button id="editor-close-warning-discard" class="song-random-submit" type="button">저장하지 않고 나가기</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-row">
+      <button id="privacy-policy-trigger" class="footer-link-button" type="button">개인정보처리방침</button>
+      <span class="site-footer-dot" aria-hidden="true">•</span>
+      <p class="site-footer-copy">본 사이트는 비공식 팬사이트입니다.</p>
+    </div>
+  </footer>
+
+  <div id="privacy-policy-modal" class="policy-modal hidden" role="dialog" aria-modal="true" aria-labelledby="privacy-policy-title">
+    <div class="policy-dialog" tabindex="-1">
+      <div class="policy-head">
+        <h3 id="privacy-policy-title">개인정보처리방침</h3>
+        <button id="privacy-policy-close" class="ghost-button ghost-button-compact" type="button">닫기</button>
+      </div>
+      <div class="policy-body">
+        <p>빈스 캘린더는 스트리머 빈스님의 관련 일정 정보를 공유하기 위한 비공식 팬사이트입니다.</p>
+        <p>본 사이트는 편집 권한 확인 및 사이트 운영을 위해 필요한 최소한의 개인정보만 처리합니다.</p>
+
+        <h4>1. 처리하는 개인정보 항목</h4>
+        <p>본 사이트는 Google 로그인 연동 과정에서 계정의 이메일 주소를 확인할 수 있습니다.</p>
+
+        <h4>2. 개인정보 처리 목적</h4>
+        <ol>
+          <li>일정 편집 권한이 있는 이용자인지 확인</li>
+          <li>로그인 상태 및 편집 가능 여부 표시</li>
+        </ol>
+
+        <h4>3. 개인정보 보유 및 이용 기간</h4>
+        <p>사이트 운영 기간 내, 운영 종료 시 즉시 파기</p>
+
+        <h4>4. 개인정보의 제3자 제공</h4>
+        <p>본 사이트는 이용자의 개인정보를 외부에 판매하거나 제공하지 않습니다.</p>
+
+        <h4>5. 개인정보 처리에 이용되는 외부 서비스</h4>
+        <ul>
+          <li>Google OAuth / Google 로그인</li>
+          <li>Firebase Authentication</li>
+          <li>Firebase Firestore</li>
+        </ul>
+        <p>위 서비스의 실제 데이터 처리 방식은 각 서비스 제공자의 정책을 따릅니다.</p>
+
+        <h4>6. 이용자의 권리</h4>
+        <p>이용자는 본인과 관련된 개인정보에 대해 열람, 정정, 삭제, 처리 중단 요청을 할 수 있습니다.</p>
+        <p>관련 요청은 아래 문의처를 통해 접수할 수 있습니다.</p>
+
+        <h4>7. 문의처</h4>
+        <p>개인정보 관련 문의 및 요청: <a href="mailto:wjddndj2@gmail.com">wjddndj2@gmail.com</a></p>
+
+        <h4>8. 고지 및 변경</h4>
+        <p>본 방침은 사이트 운영 상황에 따라 변경될 수 있으며, 중요한 변경이 있는 경우 사이트 내 공지 또는 본 팝업을 통해 안내할 수 있습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="note-modal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="note-title">
+    <div class="note-dialog" tabindex="-1">
+      <div class="note-head">
+        <h3 id="note-title">메모</h3>
+        <button id="note-close" class="ghost-button ghost-button-compact" type="button">닫기</button>
+      </div>
+      <p id="note-meta" class="note-meta"></p>
+      <pre id="note-content" class="note-content"></pre>
+    </div>
+  </div>
+
+  <div id="song-random-modal" class="song-random-modal hidden" role="dialog" aria-modal="true" aria-labelledby="song-random-title">
+    <div class="song-random-dialog" tabindex="-1">
+      <form id="song-random-form" class="song-random-form">
+        <h3 id="song-random-title">Random</h3>
+        <div class="song-random-fields">
+          <label>
+            <span>분류</span>
+            <select id="song-random-category">
+              <option value="">전체</option>
+              <option value="한식">한식</option>
+              <option value="일식">일식</option>
+              <option value="양식">양식</option>
+            </select>
+          </label>
+          <label>
+            <span>곡 수</span>
+            <input id="song-random-count" type="number" min="1" step="1" value="1">
+          </label>
+        </div>
+        <button id="song-random-submit" class="song-random-submit" type="submit">뽑기</button>
+      </form>
+      <div id="song-random-results" class="song-random-results"></div>
+    </div>
+  </div>
+
+  <div id="song-search-modal" class="song-random-modal hidden" role="dialog" aria-modal="true" aria-labelledby="song-search-heading">
+    <div class="song-random-dialog" tabindex="-1">
+      <form id="song-search-form" class="song-random-form">
+        <h3 id="song-search-heading">검색</h3>
+        <div class="song-random-fields">
+          <label>
+            <span>노래명</span>
+            <input id="song-search-title" type="text" maxlength="120" placeholder="곡명 또는 원곡명">
+          </label>
+          <label>
+            <span>아티스트</span>
+            <input id="song-search-artist" type="text" maxlength="80" placeholder="아티스트">
+          </label>
+          <label>
+            <span>분류</span>
+            <select id="song-search-category">
+              <option value="">전체</option>
+            </select>
+          </label>
+          <label>
+            <span>태그</span>
+            <select id="song-search-tag">
+              <option value="">전체</option>
+            </select>
+          </label>
+        </div>
+        <button id="song-search-submit" class="song-random-submit" type="submit">검색</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="calendar-search-modal" class="song-random-modal hidden" role="dialog" aria-modal="true" aria-labelledby="calendar-search-title" aria-describedby="calendar-search-status">
+    <div class="song-random-dialog calendar-search-dialog" tabindex="-1">
+      <form id="calendar-search-form" class="song-random-form calendar-search-form">
+        <div class="calendar-search-head">
+          <h3 id="calendar-search-title">일정 검색</h3>
+          <button id="calendar-search-close" class="calendar-search-close" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="song-random-fields calendar-search-fields">
+          <label class="calendar-search-category-field">
+            <span>카테고리</span>
+            <select id="calendar-search-category">
+              <option value="">전체</option>
+            </select>
+          </label>
+          <label>
+            <span>시작일</span>
+            <input id="calendar-search-start" type="text" inputmode="numeric" maxlength="8" placeholder="예. 20260401">
+          </label>
+          <label>
+            <span>종료일</span>
+            <input id="calendar-search-end" type="text" inputmode="numeric" maxlength="8" placeholder="예. 20260401">
+          </label>
+          <label class="calendar-search-query-field">
+            <span>검색어</span>
+            <input id="calendar-search-query" type="text" maxlength="120" placeholder="내용 또는 일정 기타 검색">
+          </label>
+        </div>
+        <div class="calendar-search-actions">
+          <button id="calendar-search-reset" class="calendar-search-reset" type="button">초기화</button>
+          <button id="calendar-search-submit" class="song-random-submit" type="submit">검색</button>
+        </div>
+      </form>
+      <div id="calendar-search-status" class="calendar-search-status" role="status" aria-live="polite">검색어 또는 필터를 입력하면 일정 결과를 보여드릴게요.</div>
+      <div id="calendar-search-results" class="calendar-search-results"></div>
+    </div>
+  </div>
+  <div id="version-history-modal" class="song-random-modal hidden" role="dialog" aria-modal="true" aria-labelledby="version-history-title" aria-describedby="version-history-status">
+    <div class="song-random-dialog version-history-dialog" tabindex="-1">
+      <div class="version-history-head">
+        <div>
+          <h3 id="version-history-title">버전 기록</h3>
+          <p id="version-history-status" class="version-history-status">관리자만 볼 수 있는 월별 기록입니다.</p>
+        </div>
+        <button id="version-history-close" class="icon-button icon-button-small" type="button" aria-label="닫기">×</button>
+      </div>
+      <div id="version-history-list" class="version-history-list"></div>
+    </div>
+  </div>
+  <datalist id="song-tag-suggestions"></datalist>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="/static/firebase-config.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
