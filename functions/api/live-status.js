@@ -1,8 +1,7 @@
 const DEFAULT_BJID = "psb010203";
 const DEFAULT_STATION_URL = "https://www.sooplive.com/station/psb010203";
 const SOOP_LIVE_API_URL = "https://live.afreecatv.com/afreeca/player_live_api.php";
-// TODO: 빈스 캘린더용 Firebase 프로젝트를 새로 만든 뒤 그 프로젝트 ID로 교체
-const DEFAULT_PROJECT_ID = "";
+const DEFAULT_PROJECT_ID = "bins-calendar";
 const DEFAULT_CALENDAR_COLLECTION = "calendar_overrides";
 const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 const GOOGLE_TOKEN_AUDIENCE = "https://oauth2.googleapis.com/token";
