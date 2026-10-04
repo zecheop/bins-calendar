@@ -29,6 +29,8 @@ const MAX_DAY_IMAGE_DATA_URL_LENGTH = 320000;
 const SITE_DATA_URL = "/static/data/site-data.json";
 const YOUTUBE_API_URL = "/api/youtube/latest?v=2026-08-01-2";
 const YOUTUBE_CACHE_STORAGE_KEY = "vince-calendar-youtube-cache";
+const HOME_MONTH_CACHE_PREFIX = "vince-calendar-home-month-v1-";
+const HOME_MONTH_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const CALENDAR_SEARCH_RESULT_LIMIT = 240;
 const LOCAL_PREVIEW_API_ORIGIN = "http://localhost:8026";
 const DEFAULT_ADMIN_EMAILS = ["wjddndj2@gmail.com"];
@@ -59,6 +61,12 @@ const state = {
   selectedMonth: 0,
   viewerOpen: false,
   songbookOpen: false,
+  homeMonthData: null,
+  homeNextMonthData: null,
+  homeMonthPending: true,
+  homeNextMonthPending: true,
+  homeAgendaPreview: null,
+  homeIntroFinished: false,
   gameOpen: false,
   memoryTodayDate: null,
   visitToday: null,
@@ -148,6 +156,14 @@ const heroVideoEl = document.getElementById("hero-video");
 const heroVideoBufferEl = document.getElementById("hero-video-buffer");
 const heroImageEl = document.getElementById("hero-image");
 const heroSectionEl = document.getElementById("hero");
+const homeAgendaEl = document.getElementById("home-agenda");
+const homeAgendaLabelEl = document.getElementById("home-agenda-label");
+const homeAgendaLiveMarkEl = document.getElementById("home-agenda-live-mark");
+const homeAgendaDateEl = document.getElementById("home-agenda-date");
+const homeAgendaNoteEl = document.getElementById("home-agenda-note");
+const homeAgendaListEl = document.getElementById("home-agenda-list");
+const homeAgendaTimeEl = document.getElementById("home-agenda-time");
+const brandHomeEl = document.getElementById("brand-home");
 const sideNavEl = document.getElementById("side-nav");
 const sideNavItemEls = sideNavEl ? Array.from(sideNavEl.querySelectorAll(".side-nav-item")) : [];
 const openCurrentMonthEl = document.getElementById("open-current-month");
@@ -1991,6 +2007,7 @@ function syncSideNav() {
     return;
   }
   const active = state.gameOpen ? "game" : state.songbookOpen ? "songbook" : state.viewerOpen ? "calendar" : "home";
+  bodyEl.dataset.page = active;
   sideNavItemEls.forEach((item) => {
     item.classList.toggle("is-active", item.dataset.nav === active);
   });
@@ -2048,6 +2065,166 @@ function openGame() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
+// 홈의 일정 카드 — 오늘 방송이 있으면 오늘을, 없거나(휴방/미등록) 이미 지난
+// 경우엔 앞으로 가장 가까운 방송일(다음 달까지)을 "다음 일정"으로 보여준다.
+// 시간은 정해진 경우(예: "뱅온 [6PM]")에만 표시한다 — 미정인 날이 대부분이라
+// "시간 미정" 문구는 쓰지 않는다.
+const HOME_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function homeDayEntries(day) {
+  return (day?.entries || [])
+    .map((item) => ({ text: String(item.text || "").trim(), color: item.categoryColor || "", label: item.categoryLabel || "" }))
+    .filter((item) => item.text);
+}
+
+function findNextScheduledDay(today, includeNextMonth = true) {
+  const months = [
+    { year: today.year, month: today.month, data: state.homeMonthData || currentBaseMonth(today.year, today.month), fromDay: today.day + 1 },
+  ];
+  const nextMonth = today.month === 12 ? { year: today.year + 1, month: 1 } : { year: today.year, month: today.month + 1 };
+  if (includeNextMonth) months.push({ ...nextMonth, data: state.homeNextMonthData || currentBaseMonth(nextMonth.year, nextMonth.month), fromDay: 1 });
+  for (const entry of months) {
+    const days = [...(entry.data?.days || [])].sort((a, b) => Number(a.day) - Number(b.day));
+    const found = days.find((day) => Number(day.day) >= entry.fromDay && !day.isOff && homeDayEntries(day).length);
+    if (found) return { year: entry.year, month: entry.month, day: found };
+  }
+  return null;
+}
+
+function homeDateLabel(year, month, dayNumber, today) {
+  const weekday = HOME_WEEKDAYS[new Date(year, month - 1, dayNumber).getDay()];
+  const diff = Math.round((Date.UTC(year, month - 1, dayNumber) - Date.UTC(today.year, today.month - 1, today.day)) / 86400000);
+  const relative = diff === 0 ? "오늘" : diff === 1 ? "내일" : diff === 2 ? "모레" : `${diff}일 후`;
+  return `${month}월 ${dayNumber}일 (${weekday}) · ${relative}`;
+}
+
+function revealHomeAgendaChange(element) {
+  if (!element?.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  element.getAnimations().forEach((animation) => animation.cancel());
+  element.animate(
+    [{ opacity: 0, transform: "translateY(5px)" }, { opacity: 1, transform: "translateY(0)" }],
+    { duration: 380, easing: "cubic-bezier(.22, 1, .36, 1)" }
+  );
+}
+
+function revealHomeAgendaLiveTitle(element) {
+  if (!element?.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  element.getAnimations().forEach((animation) => animation.cancel());
+  element.animate(
+    [
+      { height: "0px", marginTop: "-16px", opacity: 0, transform: "translateY(5px)" },
+      { height: `${element.scrollHeight}px`, marginTop: "-8px", opacity: 1, transform: "translateY(0)" },
+    ],
+    { duration: 850, easing: "cubic-bezier(.22, 1, .36, 1)" }
+  );
+}
+
+function setHomeAgendaText(element, value) {
+  if (!element || element.textContent === value) return;
+  element.textContent = value;
+  if (value) revealHomeAgendaChange(element);
+}
+
+let homeAgendaListHtml = null;
+function setHomeAgendaList(html) {
+  if (!homeAgendaListEl || homeAgendaListHtml === html) return;
+  homeAgendaListHtml = html;
+  homeAgendaListEl.innerHTML = html;
+  if (!document.body.classList.contains("is-intro") && !html.includes("home-agenda-loading")) {
+    revealHomeAgendaChange(homeAgendaListEl);
+  }
+}
+
+function renderHomeAgenda() {
+  if (!homeAgendaListEl) return;
+  const today = todayKstParts();
+  const todayKey = `${monthKey(today.year, today.month)}-${String(today.day).padStart(2, "0")}`;
+  const preview = state.homeAgendaPreview?.date === todayKey ? state.homeAgendaPreview : null;
+  if (state.homeMonthPending && !preview) {
+    renderHomeAgendaLoading("오늘 방송");
+    return;
+  }
+  const month = state.homeMonthData || currentBaseMonth(today.year, today.month);
+  const todayDay = state.homeMonthPending
+    ? preview.today?.day
+    : month?.days?.find((item) => Number(item.day) === today.day);
+  const todayEntries = homeDayEntries(todayDay);
+  const live = currentLive();
+  const showLive = Boolean(live.isLive && state.homeIntroFinished);
+  let label = "오늘 방송";
+  let target = { year: today.year, month: today.month, day: todayDay };
+  let note = "";
+  if (live.isLive) {
+    note = showLive ? live.liveTitle || "" : "";
+  } else if (todayDay?.isOff || !todayEntries.length) {
+    let next;
+    if (state.homeMonthPending) {
+      next = preview.next;
+    } else if (state.homeNextMonthPending && preview) {
+      const currentNext = findNextScheduledDay(today, false);
+      next = currentNext || (preview.next?.month !== today.month || preview.next?.year !== today.year ? preview.next : null);
+    } else {
+      next = findNextScheduledDay(today);
+    }
+    label = "다음 일정";
+    note = todayDay?.isOff ? "오늘은 휴뱅이에요" : "";
+    target = next || null;
+    if (!target && state.homeNextMonthPending && !preview) {
+      renderHomeAgendaLoading(label);
+      return;
+    }
+  }
+  homeAgendaEl?.classList.toggle("is-live", showLive);
+  homeAgendaEl?.classList.toggle("is-next", label === "다음 일정");
+  setHomeAgendaText(homeAgendaLabelEl, label);
+  const liveMarkWasHidden = homeAgendaLiveMarkEl?.classList.contains("hidden");
+  homeAgendaLiveMarkEl?.classList.toggle("hidden", !showLive);
+  if (showLive && liveMarkWasHidden) revealHomeAgendaChange(homeAgendaLiveMarkEl);
+  if (homeAgendaNoteEl) {
+    const noteChanged = homeAgendaNoteEl.textContent !== note;
+    const noteWasHidden = homeAgendaNoteEl.classList.contains("hidden");
+    homeAgendaNoteEl.textContent = note;
+    homeAgendaNoteEl.classList.toggle("hidden", !note);
+    if (note && (noteChanged || noteWasHidden)) {
+      if (showLive && noteWasHidden) revealHomeAgendaLiveTitle(homeAgendaNoteEl);
+      else revealHomeAgendaChange(homeAgendaNoteEl);
+    }
+  }
+  if (!target?.day) {
+    setHomeAgendaText(homeAgendaDateEl, "");
+    setHomeAgendaList('<li class="home-agenda-empty">예정된 일정이 아직 없어요</li>');
+    setHomeAgendaTime("");
+    return;
+  }
+  const dayNumber = Number(target.day.day);
+  setHomeAgendaText(homeAgendaDateEl, homeDateLabel(target.year, target.month, dayNumber, today));
+  const entries = homeDayEntries(target.day);
+  setHomeAgendaList(entries.length
+    ? entries.map((item) => {
+      const [first, ...rest] = item.text.split("\n");
+      return `<li class="home-agenda-item" style="--dot:${escapeHtml(item.color || "#c4b5fd")}"><span class="home-agenda-text"><strong>${escapeHtml(first)}</strong>${rest.length ? `<small>${escapeHtml(rest.join(" "))}</small>` : ""}</span>${item.label ? `<span class="home-agenda-cat">${escapeHtml(item.label)}</span>` : ""}</li>`;
+    }).join("")
+    : '<li class="home-agenda-empty">방송 중이에요</li>');
+  setHomeAgendaTime(String(target.day.timeLabel || "").trim());
+}
+
+function setHomeAgendaTime(value) {
+  if (!homeAgendaTimeEl) return;
+  homeAgendaTimeEl.textContent = value;
+  homeAgendaTimeEl.parentElement?.classList.toggle("hidden", !value);
+}
+
+function renderHomeAgendaLoading(label) {
+  homeAgendaEl?.classList.remove("is-live");
+  homeAgendaEl?.classList.toggle("is-next", label === "다음 일정");
+  if (homeAgendaLabelEl) homeAgendaLabelEl.textContent = label;
+  homeAgendaLiveMarkEl?.classList.add("hidden");
+  if (homeAgendaDateEl) homeAgendaDateEl.textContent = "";
+  if (homeAgendaNoteEl) homeAgendaNoteEl.classList.add("hidden");
+  setHomeAgendaList('<li class="home-agenda-empty home-agenda-loading">일정 확인 중</li>');
+  setHomeAgendaTime("");
+}
+
 function renderAuth() {
   const auth = currentAuth();
   if (!auth) {
@@ -2077,7 +2254,7 @@ function renderAuth() {
 }
 
 function renderHeroCurrentMonth() {
-  openCurrentMonthEl.disabled = false;
+  if (openCurrentMonthEl) openCurrentMonthEl.disabled = false;
 }
 
 function renderMonthPager() {
@@ -2118,6 +2295,7 @@ function renderProfile() {
 
 function renderLiveStatus() {
   const live = currentLive();
+  renderHomeAgenda();
   livePillEl.classList.toggle("online", !!live.isLive);
   livePillEl.classList.toggle("offline", !live.isLive);
   livePillEl.textContent = live.isLive ? "LIVE" : "OFFLINE";
@@ -3130,17 +3308,6 @@ function categoryLabelForKey(categoryKey) {
   return legendItem?.label || normalizedKey || "일정";
 }
 
-function formatMobileDayStatus(day) {
-  if (day?.isOff || String(day?.timeLabel || "").trim() === "휴뱅") {
-    return { label: "OFF", className: "off" };
-  }
-  const timeText = String(day?.timeLabel || "").trim();
-  if (timeText) {
-    return { label: truncateInlineText(timeText, 18), className: "live" };
-  }
-  return { label: "미정", className: "off" };
-}
-
 function resolveMobileSelectedDate(monthData = state.currentMonthData) {
   if (!monthData) {
     return null;
@@ -3333,8 +3500,12 @@ function renderMobileDayView() {
     return;
   }
 
-  const status = formatMobileDayStatus(day);
-  const weekDates = Array.from({ length: 7 }, (_, index) => shiftCalendarDate(selectedDate, index - 3));
+  // 구글 캘린더처럼: 선택한 날이 속한 주(일~토) → 날짜 제목 → 일정 목록.
+  const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const selectedWeekday = new Date(selectedDate.year, selectedDate.month - 1, selectedDate.day).getDay();
+  const weekDates = Array.from({ length: 7 }, (_, index) => shiftCalendarDate(selectedDate, index - selectedWeekday));
+  const now = new Date();
+  const todayDate = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
   const entries = Array.isArray(day.entries) ? day.entries : [];
   const imageUrl = day.customImageDataUrl || entries.find((entry) => entry?.imageUrl)?.imageUrl || "";
   const dayNoteButton = buildNoteTrigger(
@@ -3343,38 +3514,40 @@ function renderMobileDayView() {
     `${day.day}일 메모`,
     `${formatMonthTitle(state.currentMonthData.year, state.currentMonthData.month)} ${day.day}일`
   );
+  const isOff = day.isOff || String(day.timeLabel || "").trim() === "휴뱅";
+  const timeText = isOff ? "" : String(day.timeLabel || "").trim();
+  const statusChip = isOff ? '<span class="mday-chip is-off">휴뱅</span>' : timeText ? `<span class="mday-chip">${escapeHtml(truncateInlineText(timeText, 18))}</span>` : "";
 
   mobileDayViewEl.innerHTML = `
-    <section class="mobile-day-panel">
-      <article class="mobile-day-hero ${day.isOff ? "is-off" : ""}">
-        <div class="mobile-day-hero-top">
-          <button type="button" class="mobile-day-arrow" data-mobile-shift="-1" aria-label="이전 날짜">‹</button>
-          <div class="mobile-day-hero-copy">
-            <p class="mobile-day-kicker">${escapeHtml(formatMonthTitle(selectedDate.year, selectedDate.month))}</p>
-            <h3>${escapeHtml(String(selectedDate.day).padStart(2, "0"))}일 일정</h3>
-          </div>
-          <button type="button" class="mobile-day-arrow" data-mobile-shift="1" aria-label="다음 날짜">›</button>
-        </div>
-        <div class="mobile-day-meta">
-          <span class="mobile-day-status ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
-          <span class="mobile-day-count">${entries.length}개 일정</span>
-          ${auth?.canEdit ? '<button type="button" class="mobile-day-edit-button" data-mobile-edit-day>편집</button>' : ""}
-        </div>
-      </article>
-
-      <div class="mobile-week-strip">
+    <section class="mobile-day-panel mday">
+      <div class="mday-week">
         ${weekDates.map((item) => {
-          const weekday = ["일", "월", "화", "수", "목", "금", "토"][new Date(item.year, item.month - 1, item.day).getDay()];
           const active = isSameCalendarDate(item, selectedDate);
           const outside = Number(item.month) !== Number(state.currentMonthData.month);
+          const itemDay = outside ? null : (state.currentMonthData.days || []).find((entry) => Number(entry?.day) === Number(item.day));
+          const itemEntries = Array.isArray(itemDay?.entries) ? itemDay.entries : [];
+          const dotColor = itemEntries[0]?.categoryColor || CATEGORY_FALLBACKS[itemEntries[0]?.categoryKey] || "";
+          const weekday = new Date(item.year, item.month - 1, item.day).getDay();
           return `
-            <button type="button" class="mobile-week-chip ${active ? "is-active" : ""} ${outside ? "is-outside" : ""}" data-mobile-go-date="${item.year}-${item.month}-${item.day}">
-              <span class="mobile-weekday">${escapeHtml(weekday)}</span>
-              <span class="mobile-weekday-number">${escapeHtml(item.day)}</span>
+            <button type="button" class="mday-date${active ? " is-active" : ""}${outside ? " is-outside" : ""}${isSameCalendarDate(item, todayDate) ? " is-today" : ""}${itemDay?.isOff ? " is-off" : ""}${weekday === 0 ? " is-sun" : weekday === 6 ? " is-sat" : ""}" data-mobile-go-date="${item.year}-${item.month}-${item.day}">
+              <span class="mday-weekday">${weekdayNames[weekday]}</span>
+              <span class="mday-number">${escapeHtml(item.day)}</span>
+              <span class="mday-dot"${dotColor ? ` style="background:${escapeHtml(dotColor)}"` : ""}></span>
             </button>
           `;
         }).join("")}
       </div>
+
+      <header class="mday-head">
+        <div class="mday-title">
+          <h3>${escapeHtml(selectedDate.month)}월 ${escapeHtml(selectedDate.day)}일 ${weekdayNames[selectedWeekday]}요일${isSameCalendarDate(selectedDate, todayDate) ? ' <span class="mday-today">오늘</span>' : ""}</h3>
+          <p class="mday-meta">${statusChip}<span>일정 ${entries.length}개</span>${auth?.canEdit ? '<button type="button" class="mobile-day-edit-button" data-mobile-edit-day>편집</button>' : ""}</p>
+        </div>
+        <div class="mday-arrows">
+          <button type="button" class="mobile-day-arrow" data-mobile-shift="-1" aria-label="이전 날짜">‹</button>
+          <button type="button" class="mobile-day-arrow" data-mobile-shift="1" aria-label="다음 날짜">›</button>
+        </div>
+      </header>
 
       <div class="mobile-entry-list">
         ${entries.length ? entries.map((entry) => buildMobileEntryCard(entry, state.currentMonthData, day)).join("") : `
@@ -5290,6 +5463,10 @@ function subscribeCurrentMonthDocument(requestId) {
       const nextMonth = applyMonthOverrideData(currentBaseMonth(), snapshot.data() || {});
       state.currentMonthData = nextMonth;
       state.monthLoading = false;
+      if (state.selectedYear === todayKstParts().year && state.selectedMonth === todayKstParts().month) {
+        state.homeMonthData = nextMonth;
+        renderHomeAgenda();
+      }
       updateCalendarSearchMonthCache(state.selectedYear, state.selectedMonth, nextMonth);
       renderCalendar();
     },
@@ -5303,6 +5480,76 @@ function subscribeCurrentMonthDocument(requestId) {
       renderCalendar();
     }
   );
+}
+
+function readHomeMonthCache(year, month) {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(`${HOME_MONTH_CACHE_PREFIX}${monthKey(year, month)}`) || "null");
+    const age = Date.now() - Number(cached?.savedAt);
+    if (!cached?.days || !Number.isFinite(age) || age < 0 || age > HOME_MONTH_CACHE_MAX_AGE_MS) return null;
+    return cached.days;
+  } catch {
+    return null;
+  }
+}
+
+function writeHomeMonthCache(year, month, data) {
+  try {
+    // 홈 카드에 필요한 항목만 저장한다. 달력 이미지와 메모는 캐시에 넣지 않는다.
+    const days = Object.fromEntries(Object.entries(data?.days || {}).map(([day, value]) => [day, {
+      timeLabel: value?.timeLabel || "",
+      entries: (value?.entries || []).map((entry) => ({ text: entry?.text || "", categoryKey: entry?.categoryKey || "" })),
+    }]));
+    window.localStorage.setItem(`${HOME_MONTH_CACHE_PREFIX}${monthKey(year, month)}`, JSON.stringify({ savedAt: Date.now(), days }));
+  } catch {
+    // 저장 공간을 사용할 수 없어도 실시간 일정은 그대로 표시한다.
+  }
+}
+
+function subscribeHomeMonthDocument() {
+  const today = todayKstParts();
+  const next = today.month === 12 ? { year: today.year + 1, month: 1 } : { year: today.year, month: today.month + 1 };
+  const currentBase = currentBaseMonth(today.year, today.month);
+  const nextBase = currentBaseMonth(next.year, next.month);
+  const cachedCurrent = readHomeMonthCache(today.year, today.month);
+  const cachedNext = readHomeMonthCache(next.year, next.month);
+  state.homeMonthData = cachedCurrent ? applyMonthOverrideData(currentBase, { days: cachedCurrent }) : currentBase;
+  state.homeNextMonthData = cachedNext ? applyMonthOverrideData(nextBase, { days: cachedNext }) : nextBase;
+  state.homeMonthPending = !cachedCurrent && !state.bootstrap?.monthsByKey?.[monthKey(today.year, today.month)] && Boolean(firebaseState.db);
+  state.homeNextMonthPending = !cachedNext && !state.bootstrap?.monthsByKey?.[monthKey(next.year, next.month)] && Boolean(firebaseState.db);
+  renderHomeAgenda();
+  const ref = currentMonthDocRef(today.year, today.month);
+  if (ref) {
+    ref.onSnapshot(
+      (snapshot) => {
+        state.homeMonthData = applyMonthOverrideData(currentBaseMonth(today.year, today.month), snapshot.data() || {});
+        state.homeMonthPending = false;
+        if (!snapshot.metadata.fromCache) writeHomeMonthCache(today.year, today.month, snapshot.data());
+        renderHomeAgenda();
+      },
+      () => {
+        state.homeMonthPending = false;
+        renderHomeAgenda();
+      }
+    );
+  }
+  // 오늘 이후 이번 달에 방송이 없으면 다음 달 첫 방송을 "다음 일정"으로 보여줘야 해서
+  // 다음 달 문서도 같이 구독한다.
+  const nextRef = currentMonthDocRef(next.year, next.month);
+  if (nextRef) {
+    nextRef.onSnapshot(
+      (snapshot) => {
+        state.homeNextMonthData = applyMonthOverrideData(currentBaseMonth(next.year, next.month), snapshot.data() || {});
+        state.homeNextMonthPending = false;
+        if (!snapshot.metadata.fromCache) writeHomeMonthCache(next.year, next.month, snapshot.data());
+        renderHomeAgenda();
+      },
+      () => {
+        state.homeNextMonthPending = false;
+        renderHomeAgenda();
+      }
+    );
+  }
 }
 
 async function openGoogleLogin() {
@@ -5558,6 +5805,23 @@ function initPinballGame() {
 
 async function init() {
   applyTheme(preferredTheme());
+  // 작은 공개 일정은 큰 기본 데이터 파일과 병렬로 요청한다.
+  const publicAgendaPromise = fetchJson("/api/home-agenda").catch(() => null);
+  // 첫 화면 입장 연출(renewal.css의 body.is-intro)은 처음 열었을 때 한 번만 재생한다.
+  // 제목 글꼴이 도착한 뒤에 시작해야 기본 글꼴로 보이는 순간이 없다 — 그동안은 감춰 두고,
+  // 느린 환경에서도 1.5초 넘게 기다리지는 않는다.
+  document.body.classList.add("is-font-wait");
+  const titleFontReady = document.fonts?.load ? document.fonts.load('400 1em "Gugi"', "빈스 캘린더").catch(() => {}) : Promise.resolve();
+  Promise.race([titleFontReady, new Promise((resolve) => window.setTimeout(resolve, 1500))]).then(() => {
+    document.body.classList.remove("is-font-wait");
+    document.body.classList.add("is-intro");
+    const introDuration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 3200;
+    window.setTimeout(() => {
+      document.body.classList.remove("is-intro");
+      state.homeIntroFinished = true;
+      if (state.bootstrap) renderHomeAgenda();
+    }, introDuration);
+  });
   enableLocalHeroBackgroundPreview();
   setHeroVideos(localHeroVideoSources());
   bindHeroMotion();
@@ -5585,6 +5849,7 @@ async function init() {
   state.selectedYear = defaultMonth?.year || 0;
   state.selectedMonth = defaultMonth?.month || 0;
   state.liveStatus = buildDefaultLiveStatus();
+  state.homeMonthData = currentBaseMonth();
   state.calendarSearchStatus = "검색어 또는 필터를 입력하면 일정 결과를 보여드릴게요.";
   state.youtubeItems = readYoutubeCache();
   if (!state.youtubeItems.length) {
@@ -5599,6 +5864,12 @@ async function init() {
   renderLegend();
   renderProfile();
   renderLiveStatus();
+  subscribeHomeMonthDocument();
+  void publicAgendaPromise.then((preview) => {
+    if (!preview?.today || !("next" in preview)) return;
+    state.homeAgendaPreview = preview;
+    renderHomeAgenda();
+  });
   renderCafeNotice();
   renderCalendarSearchCategoryOptions();
   renderCalendarSearchResults();
@@ -5706,8 +5977,9 @@ window.addEventListener("resize", () => {
   refreshSongbook();
 });
 
-openCurrentMonthEl.addEventListener("click", openCurrentMonth);
-openSongbookHeroEl.addEventListener("click", () => openSongbook());
+openCurrentMonthEl?.addEventListener("click", openCurrentMonth);
+brandHomeEl?.addEventListener("click", goHome);
+openSongbookHeroEl?.addEventListener("click", () => openSongbook());
 
 sideNavItemEls.forEach((item) => {
   item.addEventListener("click", () => {

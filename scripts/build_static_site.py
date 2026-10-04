@@ -14,6 +14,7 @@ DATA_DIR = ROOT / "data"
 STATIC_DIR = ROOT / "static"
 DIST_DIR = ROOT / "dist"
 SITE_DATA_FILE = STATIC_DIR / "data" / "site-data.json"
+HOME_AGENDA_BASE_FILE = STATIC_DIR / "data" / "home-agenda-base.json"
 
 DEFAULT_LINKS = {
     "youtubeChannelUrl": "https://www.youtube.com/channel/UCXoZBh4NsEHDDzpkqCHGGdA",
@@ -266,9 +267,38 @@ def build_dist() -> None:
 
 
 def main() -> None:
+    site_data = build_site_data()
     SITE_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     SITE_DATA_FILE.write_text(
-        json.dumps(build_site_data(), ensure_ascii=False, separators=(",", ":")),
+        json.dumps(site_data, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    HOME_AGENDA_BASE_FILE.write_text(
+        json.dumps(
+            {
+                "legend": {
+                    item["key"]: {"label": item.get("label", ""), "color": item.get("color", "")}
+                    for item in site_data.get("legend", [])
+                    if item.get("key")
+                },
+                "months": {
+                    key: {
+                        str(day["day"]): {
+                            "timeLabel": day.get("timeLabel", ""),
+                            "entries": [
+                                {"text": entry.get("text", ""), "categoryKey": entry.get("categoryKey", "")}
+                                for entry in day.get("entries", [])
+                            ],
+                        }
+                        for day in month.get("days", [])
+                        if day.get("timeLabel") or day.get("entries")
+                    }
+                    for key, month in site_data.get("monthsByKey", {}).items()
+                },
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         encoding="utf-8",
     )
     build_dist()
