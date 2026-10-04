@@ -4,6 +4,11 @@
    ========================================================================== */
 
 /* 제목 글꼴이 준비될 때까지(최대 1.5초) 입장 연출 대상을 감춰 두었다가 한 번에 시작한다. */
+/* "빈스 캘린더" 글자만 담은 Hahmlet(9KB)을 사이트에 직접 두고 먼저 받아온다 — 구글 폰트 전체가
+   도착하기 전에 기본 글꼴로 제목이 보이는 순간을 막는다. (SIL OFL 1.1) */
+@font-face { font-family: "Hahmlet Title"; font-weight: 800; src: url("/static/assets/fonts/hahmlet-title.woff2") format("woff2"); font-display: block; }
+
+/* 제목 글꼴이 준비될 때까지(최대 1.5초) 입장 연출 대상을 감춰 두었다가 한 번에 시작한다. */
 body.is-font-wait .home-content, body.is-font-wait .home-footer, body.is-font-wait .side-nav, body.is-font-wait .top-actions, body.is-font-wait .brand-block { opacity: 0; }
 
 body[data-theme="light"] {
@@ -55,7 +60,7 @@ html { scroll-behavior: smooth; }
 /* ---------- 상단 바 / 탭 메뉴 ---------- */
 .topbar { top: 0; min-height: 70px; padding: 10px clamp(18px, 3vw, 48px); align-items: center; pointer-events: none; z-index: 50; }
 .topbar > * { pointer-events: auto; }
-.brand-block { display: inline-flex; align-items: center; border: 0; background: none; padding: 4px 0; font-family: "Gugi", "Noto Sans KR", sans-serif; font-size: 1.1rem; color: var(--rn-brand); white-space: nowrap; cursor: pointer; transition: opacity 240ms ease; }
+.brand-block { display: inline-flex; align-items: center; border: 0; background: none; padding: 4px 0; font-family: "Hahmlet Title", "Hahmlet", serif; font-weight: 800; font-size: 1.1rem; color: var(--rn-brand); white-space: nowrap; cursor: pointer; transition: opacity 240ms ease; }
 /* 홈에서는 가운데 큰 제목과 겹치므로 왼쪽 위 로고를 감춘다. */
 body[data-page="home"] .brand-block { opacity: 0; visibility: hidden; pointer-events: none; }
 .top-actions { margin-left: auto; }
@@ -87,18 +92,19 @@ body[data-page="home"][data-theme="light"] .side-nav { background: rgba(252, 250
 body[data-theme="dark"] .renewal-home { --home-ink: #ffffff; --home-muted: #cfc4e2; --home-card-line: rgba(255, 255, 255, 0.22); background: #0a0710; }
 body[data-theme="light"] .renewal-home { --home-ink: #231636; --home-muted: #5a4d70; --home-card-line: rgba(255, 255, 255, 0.95); background: #e9e1f7; }
 .renewal-home .hero-aura { display: none; }
-/* 배경은 같은 그림을 크게 흐려서 깔고, 오른쪽 액자에는 원본을 또렷하게 보여 준다. */
-.home-scene { position: absolute; inset: -4%; z-index: -2; background: url("/static/assets/vince-hero-crow-fight.jpg") center center / cover no-repeat; filter: blur(34px) saturate(.75) brightness(.6); }
-.renewal-home::after { content: ""; display: block; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-body[data-theme="dark"] .renewal-home::after { background: linear-gradient(100deg, rgba(10, 5, 20, 0.92) 0%, rgba(26, 12, 48, 0.74) 52%, rgba(40, 18, 74, 0.6) 100%); }
-body[data-theme="light"] .renewal-home::after { background: linear-gradient(100deg, rgba(243, 238, 252, 0.95) 0%, rgba(236, 226, 252, 0.8) 48%, rgba(226, 212, 250, 0.6) 100%); }
+.renewal-home::after { content: ""; display: block; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+body[data-theme="dark"] .renewal-home::after { background: linear-gradient(100deg, rgba(10, 5, 20, 0.9) 0%, rgba(14, 7, 28, 0.62) 42%, rgba(14, 7, 28, 0.12) 100%); }
+body[data-theme="light"] .renewal-home::after { background: linear-gradient(100deg, rgba(243, 238, 252, 0.94) 0%, rgba(240, 232, 252, 0.7) 42%, rgba(236, 226, 252, 0.08) 100%); }
+body[data-theme="light"] .renewal-home .hero-scrim { display: none; }
+body[data-theme="light"] .renewal-home .hero-image { filter: none; }
+.renewal-home .home-content, .renewal-home .home-footer { position: relative; z-index: 2; }
 
 .home-content {
   width: min(1240px, 100%); flex: 1; margin: auto; padding: clamp(24px, 6vh, 80px) 0 40px;
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: center; gap: clamp(28px, 5vw, 80px);
+  display: flex; align-items: center;
 }
-.home-copy { min-width: 0; justify-self: stretch; text-align: left; }
-.renewal-home .home-title { margin: 0 0 30px; font-family: "Gugi", "Noto Sans KR", sans-serif; font-weight: 400; font-size: clamp(2.8rem, 6.2vw, 5.6rem); line-height: 1.04; letter-spacing: -.03em; color: var(--home-ink); text-shadow: none; }
+.home-copy { min-width: 0; width: min(520px, 100%); text-align: left; }
+.renewal-home .home-title { margin: 0 0 30px; font-family: "Hahmlet Title", "Hahmlet", serif; font-weight: 800; font-size: clamp(2.8rem, 6.2vw, 5.6rem); line-height: 1.08; letter-spacing: -.02em; color: var(--home-ink); text-shadow: none; }
 .home-title .home-title-line { display: block; overflow: hidden; padding: .04em .02em .1em; white-space: nowrap; }
 .home-title .home-char { display: inline-block; will-change: transform; }
 
@@ -126,15 +132,6 @@ body[data-theme="light"] .home-agenda-item { border-left-color: color-mix(in srg
 .home-agenda-foot { min-height: 30px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--home-ink) 20%, transparent); }
 .home-agenda-time { color: var(--home-ink); font-size: .85rem; font-weight: 700; }
 
-.home-frame { margin: 0; justify-self: center; width: min(100%, 600px); }
-.renewal-home .hero-screen-shell { width: 100%; padding: 0; }
-.renewal-home .hero-screen-frame {
-  position: relative; aspect-ratio: 16 / 10; border: 0; border-radius: 22px; overflow: hidden; background: #0a0710;
-  box-shadow: 0 30px 60px rgba(8, 2, 20, 0.45), 0 0 0 1px rgba(196, 181, 253, 0.28);
-}
-.renewal-home .hero-screen-frame .hero-image { filter: none; object-position: center center; }
-.renewal-home .hero-screen-frame .hero-scrim { background: linear-gradient(180deg, transparent 55%, rgba(10, 4, 20, 0.28) 100%); }
-
 .home-footer { display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 20px; width: min(1240px, 100%); margin: 0 auto; padding: 14px 0 0; border-top: 1px solid var(--home-card-line); font-size: .78rem; text-shadow: none; color: var(--home-ink); }
 body[data-theme="dark"] .home-footer { border-top-color: rgba(255, 255, 255, 0.18); }
 .home-footer .footer-link-button { display: inline; color: var(--home-ink); font-size: .78rem; text-shadow: none; font-weight: 500; text-decoration: none; opacity: .85; }
@@ -143,7 +140,7 @@ body[data-theme="dark"] .home-footer { border-top-color: rgba(255, 255, 255, 0.1
 
 /* 첫 입장 연출 — 배경이 천천히 내려앉고, 제목 글자가 마스크 안에서 하나씩
    올라오고, 액자가 아래서부터 내려앉는다(1회만). */
-body.is-intro .home-scene { animation: home-scene-in 2.6s cubic-bezier(.2, .7, .1, 1) both; }
+body.is-intro .renewal-home .hero-image { animation: home-scene-in 2.6s cubic-bezier(.2, .7, .1, 1) both; }
 body.is-intro .renewal-home::after { animation: home-fade-in 1.4s ease both; }
 body.is-intro .home-char { animation: home-char-in 1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(.35s + var(--i) * .065s); }
 body.is-intro .home-agenda { animation: home-rise-in 1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: .95s; }
@@ -152,7 +149,6 @@ body.is-intro .home-agenda-item:nth-child(1) { animation-delay: 1.15s; }
 body.is-intro .home-agenda-item:nth-child(2) { animation-delay: 1.23s; }
 body.is-intro .home-agenda-item:nth-child(3) { animation-delay: 1.31s; }
 body.is-intro .home-agenda-item:nth-child(n+4) { animation-delay: 1.39s; }
-body.is-intro .home-frame { animation: home-frame-in 1.4s cubic-bezier(.16, 1, .3, 1) both; animation-delay: .55s; }
 body.is-intro .side-nav { animation: home-drop-in .9s cubic-bezier(.16, 1, .3, 1) both; animation-delay: .2s; }
 body.is-intro .top-actions { animation: home-fade-in .9s ease both; animation-delay: .3s; }
 body.is-intro .home-footer { animation: home-fade-in .9s ease both; animation-delay: 1.4s; }
@@ -171,16 +167,14 @@ body.is-intro .home-footer { animation: home-fade-in .9s ease both; animation-de
 @keyframes home-loading-fade { to { opacity: .45; } }
 
 @media (prefers-reduced-motion: reduce) {
-  body.is-intro .home-scene, body.is-intro .renewal-home::after, body.is-intro .home-char, body.is-intro .home-agenda,
-  body.is-intro .home-agenda-item, body.is-intro .home-frame,
+  body.is-intro .renewal-home .hero-image, body.is-intro .renewal-home::after, body.is-intro .home-char, body.is-intro .home-agenda,
+  body.is-intro .home-agenda-item,
   body.is-intro .side-nav, body.is-intro .top-actions, body.is-intro .home-footer { animation: none; }
   .home-agenda-loading { animation: none; }
 }
 
 /* ---------- 반응형 ---------- */
 @media (max-width: 860px) {
-  .home-content { grid-template-columns: 1fr; justify-items: start; }
-  .home-frame { justify-self: start; width: min(100%, 520px); }
 }
 
 @media (max-width: 1050px) {
@@ -220,12 +214,11 @@ body.is-intro .home-footer { animation: home-fade-in .9s ease both; animation-de
   .main-with-nav { padding-bottom: 0; }
 
   .renewal-home { min-height: 100vh; min-height: 100lvh; padding: 76px 18px calc(74px + env(safe-area-inset-bottom, 0px)); }
-  .home-scene { background-position: 62% center; }
-  .home-content { display: grid; grid-template-columns: 1fr; gap: 18px; padding: 18px 0 24px; }
-  .home-copy { display: contents; }
-  .renewal-home .home-title { order: 1; margin: 0; font-size: clamp(2.6rem, 13vw, 3.4rem); }
-  .home-frame { order: 2; width: min(100%, 440px); justify-self: center; }
-  .home-agenda { order: 3; width: 100%; padding-top: 16px; }
+  .renewal-home .hero-image { object-position: 62% center; }
+  .home-content { padding: 18px 0 24px; }
+  .home-copy { width: 100%; }
+  .renewal-home .home-title { margin: 0 0 22px; font-size: clamp(2.6rem, 13vw, 3.4rem); }
+  .home-agenda { width: 100%; padding-top: 16px; }
   .home-agenda-item { padding: 10px 0 10px 12px; gap: 10px; }
   .home-footer { flex-wrap: wrap; gap: 9px 17px; padding-top: 12px; }
 

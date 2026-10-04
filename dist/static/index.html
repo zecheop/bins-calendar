@@ -6,11 +6,12 @@
   <title>빈스 캘린더</title>
   <meta name="description" content="빈스 스트리머의 일정, 방송 상태, 최신 영상, 노래책을 한곳에서 보는 개인 캘린더">
   <link rel="icon" type="image/png" href="/static/assets/vince-profile.webp">
+  <link rel="preload" href="/static/assets/fonts/hahmlet-title.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dongle:wght@400;700&family=Edu+VIC+WA+NT+Hand:wght@400..700&family=Gugi&family=Noto+Sans:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Dongle:wght@400;700&family=Edu+VIC+WA+NT+Hand:wght@400..700&family=Hahmlet:wght@700;800&family=Noto+Sans:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css?v=2026-09-28-1">
-  <link rel="stylesheet" href="/static/renewal.css?v=2026-10-05-4">
+  <link rel="stylesheet" href="/static/renewal.css?v=2026-10-05-6">
 </head>
 <body data-theme="light" data-page="home">
   <div class="page-glow" aria-hidden="true"></div>
@@ -54,7 +55,10 @@
 
   <main class="main-with-nav">
     <section class="hero renewal-home" id="hero">
-      <div class="home-scene" aria-hidden="true"></div>
+      <video class="hero-video" id="hero-video" autoplay muted playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
+      <video class="hero-video hero-video-buffer" id="hero-video-buffer" muted playsinline preload="auto" aria-hidden="true"></video>
+      <img class="hero-image" id="hero-image" src="/static/assets/vince-hero-crow-fight.jpg" alt="빈스 캘린더 표지 이미지">
+      <div class="hero-scrim"></div>
       <div class="home-content">
         <div class="home-copy">
           <h1 class="home-title" aria-label="빈스 캘린더">
@@ -74,16 +78,6 @@
             </div>
           </div>
         </div>
-        <figure class="home-frame" aria-hidden="true">
-          <div class="hero-screen-shell">
-            <div class="hero-screen-frame">
-              <video class="hero-video" id="hero-video" autoplay muted playsinline preload="metadata" tabindex="-1"></video>
-              <video class="hero-video hero-video-buffer" id="hero-video-buffer" muted playsinline preload="auto"></video>
-              <img class="hero-image" id="hero-image" src="/static/assets/vince-hero-crow-fight.jpg" alt="">
-              <div class="hero-scrim"></div>
-            </div>
-          </div>
-        </figure>
       </div>
       <footer class="site-footer home-footer">
         <button id="privacy-policy-trigger" class="footer-link-button" type="button">개인정보처리방침</button>
