@@ -92,8 +92,13 @@
         }, 1000);
       };
 
+      // 브라우저에서는 채팅 서버의 메시지가 문자열이 아니라 Blob(바이너리 프레임)으로 온다.
+      // 문자열로만 처리하면 모든 패킷이 버려져서 "참가"가 하나도 안 잡힌다.
+      ws.binaryType = "arraybuffer";
+      const decoder = new TextDecoder("utf-8");
       ws.onmessage = (event) => {
-        handleRawPacket(String(event.data || ""));
+        const data = event.data;
+        handleRawPacket(typeof data === "string" ? data : decoder.decode(data));
       };
 
       ws.onerror = () => {
