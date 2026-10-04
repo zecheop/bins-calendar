@@ -28,10 +28,10 @@ service cloud.firestore {
 
     // 핀볼 게임 기록은 아무나 돌린 테스트까지 다 쌓이면 의미가 없어서,
     // 스트리머 본인 등 지정된 계정으로 로그인했을 때만 기록되게 한다.
-    // TODO: 빈스 본인 계정 이메일이 정해지면 여기에 추가
+    // static/game/ui.js의 GAME_LOG_RUNNER_EMAILS와 같은 목록으로 유지한다.
     function isGameLogRunner() {
       return hasVerifiedEmail()
-        && request.auth.token.email == "wjddndj2@gmail.com";
+        && request.auth.token.email in ["wjddndj2@gmail.com", "psb010203@gmail.com"];
     }
 
     function isOwnVersionSaveUpdate() {

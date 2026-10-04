@@ -11,8 +11,8 @@
   // 다 쌓이면 기록이 의미 없어지므로, 로그인 이메일이 이 목록에 있을 때만 기록한다.
   // 실제 허용 여부는 Firestore 보안 규칙(isGameLogRunner)이 최종적으로 검사한다 —
   // 여기 배열은 화면에서 불필요한 쓰기 시도를 미리 걸러내는 용도일 뿐이다.
-  // TODO: 빈스 본인 계정 이메일이 정해지면 추가 (firestore.rules의 isGameLogRunner()도 같이 갱신)
-  const GAME_LOG_RUNNER_EMAILS = ["wjddndj2@gmail.com"];
+  // firestore.rules의 isGameLogRunner()와 같은 목록으로 유지한다.
+  const GAME_LOG_RUNNER_EMAILS = ["wjddndj2@gmail.com", "psb010203@gmail.com"];
 
   function recordGameLog(ranking) {
     const user = global.firebase?.auth?.().currentUser;
@@ -473,14 +473,14 @@
     // 재생 버튼을 누른 뒤에야 플레이어를 만들면 iframe 로딩+핸드셰이크 시간만큼
     // 소리가 늦게 나온다 — BGM 패널을 여는 시점(재생 전)에 미리 초기화해서
     // 실제로 재생 버튼을 누를 땐 이미 준비된 상태가 되게 한다.
-    let bgmInited = false;
-    let bgmPlaying = false;
     let bgmMuted = false;
+    function renderBgmPlayButton(playing) {
+      bgmPlayBtn.textContent = playing ? "⏸" : "▶";
+      bgmPlayBtn.setAttribute("aria-label", playing ? "일시정지" : "재생");
+    }
+    global.MarbleBgm.onChange(renderBgmPlayButton);
     function ensureBgmInited() {
-      if (!bgmInited) {
-        global.MarbleBgm.init("game-bgm-mount", Number(bgmVolumeEl.value));
-        bgmInited = true;
-      }
+      global.MarbleBgm.init("game-bgm-mount", Number(bgmVolumeEl.value));
     }
     bgmToggleBtn.addEventListener("click", () => {
       const nextOpen = bgmPanelEl.classList.contains("hidden");
@@ -492,13 +492,14 @@
     });
     bgmPlayBtn.addEventListener("click", () => {
       ensureBgmInited();
-      bgmPlaying = !bgmPlaying;
-      if (bgmPlaying) {
-        global.MarbleBgm.play();
-        bgmPlayBtn.textContent = "⏸";
+      // 화면 표시만 믿지 않고 실제 플레이어 상태로 판단한다 — 재생을 눌렀는데 브라우저가
+      // 막아서 멈춰 있으면, 다음 클릭은 일시정지가 아니라 다시 재생이 된다.
+      const bgm = global.MarbleBgm;
+      const shouldPause = bgm.isPlaying() && (bgm.isActuallyPlaying() || !bgm.isReady());
+      if (shouldPause) {
+        bgm.pause();
       } else {
-        global.MarbleBgm.pause();
-        bgmPlayBtn.textContent = "▶";
+        bgm.play();
       }
     });
     bgmMuteBtn.addEventListener("click", () => {
