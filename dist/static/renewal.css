@@ -4,9 +4,9 @@
    ========================================================================== */
 
 /* 제목 글꼴이 준비될 때까지(최대 1.5초) 입장 연출 대상을 감춰 두었다가 한 번에 시작한다. */
-/* "빈스 캘린더" 글자만 담은 Pretendard SemiBold(1KB)를 사이트에 직접 두고 먼저 받아온다 — 다른 글꼴이
-   도착하기 전에 기본 글꼴로 제목이 보이는 순간을 막는다. (SIL OFL 1.1, 라이선스 전문: assets/fonts/LICENSE-Pretendard.txt) */
-@font-face { font-family: "Pretendard Title"; font-weight: 600; src: url("/static/assets/fonts/pretendard-title.woff2") format("woff2"); font-display: block; }
+/* 배달의민족 꾸불림체에서 "빈스 캘린더" 글자만 남긴 파일(3KB)을 사이트에 직접 두고 먼저 받아온다 — 다른 글꼴이
+   도착하기 전에 기본 글꼴로 제목이 보이는 순간을 막는다. (SIL OFL 1.1, 라이선스 전문: assets/fonts/LICENSE-BMkkubulim.txt) */
+@font-face { font-family: "BM Kkubulim"; font-weight: 400; src: url("/static/assets/fonts/bm-kkubulim-title.woff2") format("woff2"); font-display: block; }
 
 /* 제목 글꼴이 준비될 때까지(최대 1.5초) 입장 연출 대상을 감춰 두었다가 한 번에 시작한다. */
 body.is-font-wait .home-content, body.is-font-wait .home-footer, body.is-font-wait .side-nav, body.is-font-wait .top-actions, body.is-font-wait .brand-block { opacity: 0; }
@@ -60,7 +60,7 @@ html { scroll-behavior: smooth; }
 /* ---------- 상단 바 / 탭 메뉴 ---------- */
 .topbar { top: 0; min-height: 70px; padding: 10px clamp(18px, 3vw, 48px); align-items: center; pointer-events: none; z-index: 50; }
 .topbar > * { pointer-events: auto; }
-.brand-block { display: inline-flex; align-items: center; border: 0; background: none; padding: 4px 0; font-family: "Pretendard Title", "Noto Sans KR", sans-serif; font-weight: 600; font-size: 1.1rem; letter-spacing: -.02em; color: var(--rn-brand); white-space: nowrap; cursor: pointer; transition: opacity 240ms ease; }
+.brand-block { display: inline-flex; align-items: center; border: 0; background: none; padding: 4px 0; font-family: "BM Kkubulim", "Noto Sans KR", sans-serif; font-weight: 400; font-size: 1.1rem; letter-spacing: -.02em; color: var(--rn-brand); white-space: nowrap; cursor: pointer; transition: opacity 240ms ease; }
 /* 홈에서는 가운데 큰 제목과 겹치므로 왼쪽 위 로고를 감춘다. */
 body[data-page="home"] .brand-block { opacity: 0; visibility: hidden; pointer-events: none; }
 .top-actions { margin-left: auto; }
@@ -104,7 +104,7 @@ body[data-theme="light"] .renewal-home .hero-image { filter: none; }
   display: flex; align-items: center;
 }
 .home-copy { min-width: 0; width: min(520px, 100%); text-align: left; }
-.renewal-home .home-title { margin: 0 0 30px; font-family: "Pretendard Title", "Noto Sans KR", sans-serif; font-weight: 600; font-size: clamp(2.8rem, 6.2vw, 5.6rem); line-height: 1.1; letter-spacing: -.045em; color: var(--home-ink); text-shadow: none; }
+.renewal-home .home-title { margin: 0 0 30px; font-family: "BM Kkubulim", "Noto Sans KR", sans-serif; font-weight: 400; font-synthesis: none; font-size: clamp(2.8rem, 6.2vw, 5.6rem); line-height: 1.1; letter-spacing: -.02em; color: var(--home-ink); text-shadow: none; }
 .home-title .home-title-line { display: block; overflow: hidden; padding: .04em .02em .1em; white-space: nowrap; }
 .home-title .home-char { display: inline-block; will-change: transform; }
 

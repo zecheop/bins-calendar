@@ -5811,7 +5811,7 @@ async function init() {
   // 제목 글꼴이 도착한 뒤에 시작해야 기본 글꼴로 보이는 순간이 없다 — 그동안은 감춰 두고,
   // 느린 환경에서도 1.5초 넘게 기다리지는 않는다.
   document.body.classList.add("is-font-wait");
-  const titleFontReady = document.fonts?.load ? document.fonts.load('600 1em "Pretendard Title"', "빈스 캘린더").catch(() => {}) : Promise.resolve();
+  const titleFontReady = document.fonts?.load ? document.fonts.load('400 1em "BM Kkubulim"', "빈스 캘린더").catch(() => {}) : Promise.resolve();
   Promise.race([titleFontReady, new Promise((resolve) => window.setTimeout(resolve, 1500))]).then(() => {
     document.body.classList.remove("is-font-wait");
     document.body.classList.add("is-intro");
