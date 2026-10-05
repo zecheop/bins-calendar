@@ -179,6 +179,11 @@
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
 
+      // 스턴 중인 마블 — 매 프레임 무작위로 다시 그려서 지직거리는 느낌을 낸다.
+      if (marble.stunRemaining > 0) {
+        drawStunCrackle(ctx, x, y, r);
+      }
+
       // 참고 사이트 marble.ts의 _renderCoolTime과 같은 스킬 쿨타임 게이지 —
       // 텍스트 안내 없이 마블 테두리에 호로 표시한다. 원본은 다 찬 상태에서
       // 줄어드는 방향이지만, 여기서는 "게이지가 차오른다"는 사용자 요청에 맞게
@@ -208,6 +213,39 @@
     return leader;
   }
 
+  // 스턴 상태 — 매 프레임 각도/흔들림을 무작위로 다시 뽑아서 그리기 때문에
+  // (별도 애니메이션 상태 없이) 연속 재생되면 자연스럽게 지직거리는 느낌이 난다.
+  function drawStunCrackle(ctx, cx, cy, r) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(170, 230, 255, 0.95)";
+    ctx.lineWidth = Math.max(1, r * 0.14);
+    ctx.lineCap = "round";
+    const boltCount = 5;
+    for (let i = 0; i < boltCount; i++) {
+      const baseAngle = (Math.PI * 2 * i) / boltCount + Math.random() * 0.8;
+      const segs = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(baseAngle) * r * 0.9, cy + Math.sin(baseAngle) * r * 0.9);
+      for (let s = 1; s <= segs; s++) {
+        const t = s / segs;
+        // 번개가 옆 마블까지 뻗으면 여러 개가 같이 걸린 것처럼 보여서, 마블
+        // 지름 정도 안에서만 튀게 짧게 잡는다.
+        const dist = r * (0.9 + 0.8 * t);
+        const jitter = (Math.random() - 0.5) * r * 0.5;
+        const nx = cx + Math.cos(baseAngle) * dist + Math.cos(baseAngle + Math.PI / 2) * jitter;
+        const ny = cy + Math.sin(baseAngle) * dist + Math.sin(baseAngle + Math.PI / 2) * jitter;
+        ctx.lineTo(nx, ny);
+      }
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(140, 210, 255, 0.45)";
+    ctx.lineWidth = Math.max(2, r * 0.35);
+    ctx.arc(cx, cy, r * 1.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const IMPACT_RADIUS_PX = 440; // physics.js의 IMPACT_RADIUS_PX와 동일(10m*44px/m)
 
   // 참고 사이트 skillEffect.ts를 그대로 옮겼다 — 충격파를 낸 자리에 500ms 동안
@@ -220,22 +258,23 @@
       const radius = rate * IMPACT_RADIUS_PX * scale;
       ctx.save();
       ctx.globalAlpha = 1 - rate * rate;
-      ctx.strokeStyle = "rgba(255, 205, 110, 0.9)";
+      ctx.strokeStyle = effect.color || "rgba(255, 205, 110, 0.9)";
       ctx.lineWidth = Math.max(1, 2 * scale);
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
       // 펀치 난입의 타격 충격파는 훨씬 굵고 밝은 두 겹 링 + 중심 섬광으로
-      // 눈에 확 띄게 그려서 "턱" 꽂히는 느낌을 살린다.
+      // 눈에 확 띄게 그려서 "턱" 꽂히는 느낌을 살린다. 섞기/스턴처럼 색을
+      // 따로 지정한 이펙트는 effect.bigColor로 테마 색(보라/하늘색 등)을 쓴다.
       if (effect.big) {
-        ctx.strokeStyle = "rgba(255, 240, 200, 0.95)";
+        ctx.strokeStyle = effect.bigColor || "rgba(255, 240, 200, 0.95)";
         ctx.lineWidth = Math.max(2, 5 * scale) * (1 - rate * 0.7);
         ctx.beginPath();
         ctx.arc(x, y, radius * 0.6, 0, Math.PI * 2);
         ctx.stroke();
         if (rate < 0.3) {
           ctx.globalAlpha = (1 - rate / 0.3) * 0.9;
-          ctx.fillStyle = "rgba(255, 250, 220, 0.9)";
+          ctx.fillStyle = effect.bigColor || "rgba(255, 250, 220, 0.9)";
           ctx.beginPath();
           ctx.arc(x, y, Math.max(6, 22 * scale) * (1 - rate), 0, Math.PI * 2);
           ctx.fill();
@@ -290,15 +329,161 @@
     return cached.img;
   }
 
-  // 빈스 캘린더는 납치/펀치 난입 효과를 항상 꺼둔 상태라(캐릭터 아트가 없음)
-  // 어차피 그려질 일이 없는 이미지를 미리 받아올 필요가 없다 — 원래 있던
-  // 즉시 preload 로직은 제거하고, getEffectFrameImage가 실제로 그려질 때만
-  // (지금은 절대 없음) 지연 로드하도록 둔다.
+  // 난입이 실제로 발동된 순간에야 이미지를 불러오기 시작하면, 로드가 끝나기
+  // 전 몇 프레임 동안 이모지 대체 화면이 먼저 보이는 버그가 있었다 —
+  // 스크립트가 로드되자마자 미리 불러와서 실제 발동 시점엔 항상 캐시돼
+  // 있게 한다.
+  // 빈스 캘린더는 납치/펀치 난입을 쓰지 않아서(캐릭터 그림이 없음) 미리 불러오지 않는다.
 
   // 등장(0~0.35) -> 유지/타격(0.35~0.65) -> 퇴장(0.65~1) 3단계로 위에서
   // 슬라이드되어 들어왔다 나가는 캐릭터 + 배너 텍스트를 그린다.
+  // "섞기" — hitAtSec 전까지는 잠깐 멈춘 채 있다가 두 마블이
+  // 서로의 자리를 향해 호를 그리며 이동하는 모습을 보여주고, hitAtSec 순간
+  // marble-race.js가 실제로 자리를 맞바꾸며 hidden을 풀어서 평소처럼 보이게
+  // 넘긴다. 두 마블이 멀면 카메라가 크게 축소되므로, 이동하는 마블은 최소
+  // 크기를 보장하고 도착 후엔 잠깐 도착 지점을 링으로 표시한다.
+  const SHUFFLE_FREEZE_FRACTION = 0.3;
+  const SHUFFLE_MIN_DOT_RADIUS_PX = 8;
+  // 섞이는 두 마블의 이름표 — 멀리 떨어져 카메라가 크게 축소돼도 누가 누구랑
+  // 바뀌는지 바로 읽히도록 화면 기준 최소 크기 + 굵게 + 어두운 외곽선.
+  const SHUFFLE_LABEL_MIN_FONT_PX = 18;
+
+  function drawShuffleLabel(ctx, name, x, y, scale) {
+    if (!name) return;
+    const fontPx = Math.max(SHUFFLE_LABEL_MIN_FONT_PX, 13 * scale);
+    ctx.font = `800 ${Math.round(fontPx)}px "Noto Sans KR", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(3, fontPx * 0.22);
+    ctx.strokeStyle = "rgba(10, 16, 20, 0.9)";
+    ctx.strokeText(name, x, y);
+    ctx.fillStyle = "rgba(240, 225, 255, 1)";
+    ctx.fillText(name, x, y);
+  }
+
+  function drawShuffleSwap(ctx, camera, canvasW, canvasH, intrusion) {
+    if (intrusion.hitApplied) {
+      const hitAtFrac = intrusion.pauseSec ? intrusion.hitAtSec / intrusion.pauseSec : 0.6;
+      const tail = Math.max(0, Math.min(1, (intrusion.progress - hitAtFrac) / Math.max(0.001, 1 - hitAtFrac)));
+      drawLandingRing(ctx, camera, canvasW, canvasH, intrusion.targetX, intrusion.targetY, tail, intrusion.targetName);
+      drawLandingRing(ctx, camera, canvasW, canvasH, intrusion.targetBX, intrusion.targetBY, tail, intrusion.targetBName);
+      return;
+    }
+    const hp = Math.min(1, intrusion.hitProgress);
+    const rawT = Math.max(0, (hp - SHUFFLE_FREEZE_FRACTION) / (1 - SHUFFLE_FREEZE_FRACTION));
+    const eased = rawT * rawT * (3 - 2 * rawT);
+
+    drawSwapDot(ctx, camera, canvasW, canvasH, intrusion.targetX, intrusion.targetY, intrusion.targetBX, intrusion.targetBY, eased, intrusion.targetColor, intrusion.targetName);
+    drawSwapDot(ctx, camera, canvasW, canvasH, intrusion.targetBX, intrusion.targetBY, intrusion.targetX, intrusion.targetY, eased, intrusion.targetBColor, intrusion.targetBName);
+  }
+
+  function drawSwapDot(ctx, camera, canvasW, canvasH, fromX, fromY, toX, toY, t, color, name) {
+    const wx = fromX + (toX - fromX) * t;
+    // 직선으로 이동하면 중간에 서로 겹쳐 지나가므로, 위로 살짝 호를 그려 갈라지게 한다.
+    const arc = Math.sin(t * Math.PI) * 60;
+    const wy = fromY + (toY - fromY) * t - arc;
+    const [x, y, scale] = worldToScreen(camera, canvasW, canvasH, wx, wy);
+    const r = Math.max(SHUFFLE_MIN_DOT_RADIUS_PX, 11 * scale) * (1 + 0.15 * Math.sin(t * Math.PI));
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = color || "#cccccc";
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, r * 0.22);
+    ctx.strokeStyle = "rgba(225, 200, 245, 0.95)";
+    ctx.stroke();
+    drawShuffleLabel(ctx, name, x, y - r - 6, scale);
+    ctx.restore();
+  }
+
+  function drawLandingRing(ctx, camera, canvasW, canvasH, wx, wy, tail, name) {
+    const [x, y, scale] = worldToScreen(camera, canvasW, canvasH, wx, wy);
+    const r = Math.max(14, 20 * scale) * (1 + tail * 0.6);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - tail);
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(225, 200, 245, 0.95)";
+    ctx.lineWidth = Math.max(2, 3 * scale);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    drawShuffleLabel(ctx, name, x, y - r - 6, scale);
+    ctx.restore();
+  }
+
+  // "워프" — hitAtSec 전까지는 원래 자리(targetX/Y, hitApplied 전까지는 고정)에
+  // 블랙홀이 자라나며 마블을 빨아들이고, hitAtSec 순간 marble-race.js가 실제
+  // 순간이동 + hidden 해제를 하면(이후 targetX/Y는 도착 지점) 그 위에 웜홀이
+  // 나타났다 사라지는 걸로 이어 그린다.
+  function drawWarpEffect(ctx, camera, canvasW, canvasH, intrusion) {
+    if (!intrusion.hitApplied) {
+      const hp = Math.min(1, intrusion.hitProgress);
+      drawBlackHole(ctx, camera, canvasW, canvasH, intrusion.targetX, intrusion.targetY, hp, intrusion.targetColor);
+    } else {
+      const hitAtFrac = intrusion.pauseSec ? intrusion.hitAtSec / intrusion.pauseSec : 0.5;
+      const tail = Math.max(0, Math.min(1, (intrusion.progress - hitAtFrac) / Math.max(0.001, 1 - hitAtFrac)));
+      drawWormhole(ctx, camera, canvasW, canvasH, intrusion.targetX, intrusion.targetY, tail);
+    }
+  }
+
+  function drawBlackHole(ctx, camera, canvasW, canvasH, wx, wy, hp, color) {
+    const [x, y, scale] = worldToScreen(camera, canvasW, canvasH, wx, wy);
+    const growT = Math.min(1, hp / 0.7);
+    const holeR = (14 + 50 * growT) * scale;
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const wobble = Math.sin(hp * 18 + i * 2) * 4 * scale;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(60, 30, 90, ${0.55 - i * 0.14})`;
+      ctx.lineWidth = Math.max(1.5, (6 - i * 1.5) * scale);
+      ctx.arc(x, y, Math.max(1, holeR - i * 8 * scale + wobble), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.fillStyle = "rgba(10, 4, 18, 0.92)";
+    ctx.arc(x, y, holeR * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 70%(hp=0.4)부터 마블이 점점 작아지며 중심으로 빨려 들어간다.
+    const suckT = Math.max(0, Math.min(1, (hp - 0.4) / 0.6));
+    if (suckT < 1) {
+      const mr = 11 * scale * (1 - suckT);
+      ctx.beginPath();
+      ctx.globalAlpha = 1 - suckT * 0.3;
+      ctx.fillStyle = color || "#cccccc";
+      ctx.arc(x, y, Math.max(0.5, mr), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawWormhole(ctx, camera, canvasW, canvasH, wx, wy, tail) {
+    const [x, y, scale] = worldToScreen(camera, canvasW, canvasH, wx, wy);
+    const r = 60 * (1 - tail * 0.6) * scale;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - tail);
+    for (let i = 0; i < 3; i++) {
+      const wobble = Math.sin(tail * 14 + i * 2) * 3 * scale;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(150, 230, 255, ${0.6 - i * 0.15})`;
+      ctx.lineWidth = Math.max(1.5, (5 - i) * scale);
+      ctx.arc(x, y, Math.max(1, r - i * 6 * scale + wobble), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawIntrusion(ctx, camera, canvasW, canvasH, intrusion) {
-    if (!intrusion || !intrusion.active) {
+    // leading: 카메라가 대상에게 넘어가는 중 — 아직 아무 연출도 시작하지 않는다.
+    if (!intrusion || !intrusion.active || intrusion.leading) {
+      return;
+    }
+    if (intrusion.effect === "shuffle") {
+      drawShuffleSwap(ctx, camera, canvasW, canvasH, intrusion);
+      return;
+    }
+    if (intrusion.effect === "warp") {
+      drawWarpEffect(ctx, camera, canvasW, canvasH, intrusion);
       return;
     }
     const config = INTRUSION_EFFECTS[intrusion.effect] || INTRUSION_EFFECTS.punch;

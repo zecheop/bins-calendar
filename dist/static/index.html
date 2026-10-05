@@ -348,6 +348,28 @@
               <span id="race-speed-value">1.0×</span>
             </div>
 
+            <div class="race-intrusion-conditions">
+              <p class="race-panel-label race-intrusion-label">난입 조건</p>
+              <div class="race-intrusion-options">
+                <label class="race-intrusion-toggle">
+                  <input id="race-intrusion-shuffle" type="checkbox" checked />
+                  <span>섞기</span>
+                </label>
+                <label class="race-intrusion-toggle">
+                  <input id="race-intrusion-stun" type="checkbox" checked />
+                  <span>스턴</span>
+                </label>
+                <label class="race-intrusion-toggle">
+                  <input id="race-intrusion-warp" type="checkbox" checked />
+                  <span>워프</span>
+                </label>
+              </div>
+              <div class="race-intrusion-max-row">
+                <label class="race-panel-label" for="race-intrusion-max">최대 발동 횟수</label>
+                <input id="race-intrusion-max" type="number" min="0" step="1" value="3" class="race-manual-effect-budget-input" />
+              </div>
+            </div>
+
             <div class="race-panel-stats">
               <span>전체 <b id="race-stat-total">0</b></span>
               <span>생존 <b id="race-stat-alive">0</b></span>

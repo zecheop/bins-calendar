@@ -32,6 +32,14 @@
   // 방금 스폰된 무리 전체(+여백)가 화면에 딱 맞게 들어오는 배율을 계산한다.
   // 인원이 적으면 무리가 작아서 확대되어 네임태그가 잘 보이고, 인원이
   // 많아서 무리가 커지면 자동으로 축소되어 전체가 한 화면에 들어온다.
+  // 사각 영역(+여백)이 화면에 딱 맞게 들어오는 배율.
+  function fitZoomForBox(minX, maxX, minY, maxY, padding, course, canvasWidth, canvasHeight) {
+    const spanX = Math.max(1, maxX - minX + padding * 2);
+    const spanY = Math.max(1, maxY - minY + padding * 2);
+    const baseScale = canvasWidth / course.width; // zoom=1일 때의 world->screen 배율
+    return Math.min(canvasWidth / (spanX * baseScale), canvasHeight / (spanY * baseScale));
+  }
+
   function computeArrangedView(marbles, course, canvasWidth, canvasHeight) {
     let minX = Infinity;
     let maxX = -Infinity;
@@ -45,14 +53,32 @@
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
     }
-    const spanX = Math.max(1, maxX - minX + ARRANGED_VIEW_PADDING_PX * 2);
-    const spanY = Math.max(1, maxY - minY + ARRANGED_VIEW_PADDING_PX * 2);
-    const baseScale = canvasWidth / course.width; // zoom=1일 때의 world->screen 배율
-    const fitZoom = Math.min(canvasWidth / (spanX * baseScale), canvasHeight / (spanY * baseScale));
+    const fitZoom = fitZoomForBox(minX, maxX, minY, maxY, ARRANGED_VIEW_PADDING_PX, course, canvasWidth, canvasHeight);
     return {
       x: (minX + maxX) / 2,
       y: (minY + maxY) / 2,
       zoom: Math.max(ARRANGED_VIEW_MIN_ZOOM, Math.min(ARRANGED_VIEW_MAX_ZOOM, fitZoom)),
+    };
+  }
+
+  // 섞기처럼 두 마블이 멀리 떨어져 있을 수 있는 연출은, 둘 다 한 화면에 들어올
+  // 때까지 축소한다. 가까우면 평소 연출 배율. 여백은 코스 좌표가 아니라 화면
+  // 픽셀로 잡아야 크게 축소돼도 가장자리 마블의 이름표가 잘리지 않는다.
+  const FIT_BOX_SCREEN_PADDING_PX = 56;
+  const FIT_BOX_ARC_PX = 60; // renderer.js drawSwapDot이 위로 그리는 호 높이
+  const FIT_BOX_MIN_ZOOM = 0.05;
+
+  function computeFitBoxView(box, course, canvasWidth, canvasHeight) {
+    const baseScale = canvasWidth / course.width;
+    const spanX = Math.max(1, box.maxX - box.minX);
+    const spanY = Math.max(1, box.maxY - box.minY + FIT_BOX_ARC_PX);
+    const usableW = Math.max(1, canvasWidth - FIT_BOX_SCREEN_PADDING_PX * 2);
+    const usableH = Math.max(1, canvasHeight - FIT_BOX_SCREEN_PADDING_PX * 2);
+    const fitZoom = Math.min(usableW / (spanX * baseScale), usableH / (spanY * baseScale));
+    return {
+      x: (box.minX + box.maxX) / 2,
+      y: (box.minY - FIT_BOX_ARC_PX + box.maxY) / 2,
+      zoom: Math.max(FIT_BOX_MIN_ZOOM, Math.min(INTRUSION_FOCUS_ZOOM, fitZoom)),
     };
   }
 
@@ -62,16 +88,26 @@
     // 도중 다른 맵으로 바꾸면 이전 맵 폭 기준으로 렌더링되는 버그가 있었다.
     camera.courseWidth = course.width;
 
-    // 난입(펀치/납치)이 진행되는 동안에는 평소의 "우승 후보 추적"을 잠깐
-    // 멈추고, 카메라가 이펙트가 벌어지는 자리로 이동 + 확대해서 화면에서
-    // 무슨 일이 일어나는지 바로 보이게 한다.
-    if (intrusion && intrusion.active) {
-      camera.targetX = intrusion.x;
-      camera.targetY = intrusion.y - 70;
-      camera.targetZoom = INTRUSION_FOCUS_ZOOM;
-      camera.x += (camera.targetX - camera.x) * Math.min(1, dt * 2.2);
-      camera.y += (camera.targetY - camera.y) * Math.min(1, dt * 2.2);
-      camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * 3);
+    // 방해기능(납치/펀치/섞기/워프 연출 중이거나 스턴 중인 마블이 있을 때)이
+    // 진행되는 동안에는 평소의 "우승 후보 추적"을 잠깐 멈추고, 카메라가
+    // 이펙트가 벌어지는 자리로 이동 + 확대해서 화면에서 무슨 일이 일어나는지
+    // 바로 보이게 한다. 스턴은 물리를 멈추지 않지만 카메라 초점만은 같이 옮긴다.
+    if (intrusion && intrusion.cameraFocus) {
+      if (intrusion.fitBox) {
+        const view = computeFitBoxView(intrusion.fitBox, course, canvasWidth, canvasHeight);
+        camera.targetX = view.x;
+        camera.targetY = view.y;
+        camera.targetZoom = view.zoom;
+      } else {
+        camera.targetX = intrusion.x;
+        camera.targetY = intrusion.y - 70;
+        camera.targetZoom = INTRUSION_FOCUS_ZOOM;
+      }
+      // 평소 추적(dt*2.2)보다 빠르게 당겨서, 연출 시작 전 대기(0.6초) 안에
+      // 카메라가 거의 다 도착하게 한다.
+      camera.x += (camera.targetX - camera.x) * Math.min(1, dt * 5);
+      camera.y += (camera.targetY - camera.y) * Math.min(1, dt * 5);
+      camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * 5);
       return;
     }
 

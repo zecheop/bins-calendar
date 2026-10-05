@@ -279,6 +279,86 @@
     }
   }
 
+  // 마블의 현재 위치/속도/각도를 px 변환 없이(미터 그대로) 스냅샷으로 떠둔다 —
+  // swap/shuffle/stun(고정) 모두 "지금 상태를 떠서 다른 바디에 되돌려 쓰는" 같은
+  // 패턴이라 이 함수 하나로 공유한다.
+  function captureMarbleSnapshot(marble) {
+    if (!marble._b2body) return null;
+    const pos = marble._b2body.GetPosition();
+    const vel = marble._b2body.GetLinearVelocity();
+    return { x: pos.x, y: pos.y, vx: vel.x, vy: vel.y, angle: marble._b2body.GetAngle() };
+  }
+
+  // 스냅샷을 바디에 되돌려 쓰고, stepPhysics가 매 프레임 갱신하는 px 미러
+  // 필드(marble.body.position/velocity)도 같이 맞춘다 — 안 맞추면 다음 프레임
+  // 렌더러가 리셋 직전의 옛 위치를 한 프레임 더 그린다.
+  function applyMarbleSnapshot(physics, marble, snap) {
+    if (!marble._b2body || !snap) return;
+    marble._b2body.SetTransform(new physics.Box2D.b2Vec2(snap.x, snap.y), snap.angle);
+    marble._b2body.SetLinearVelocity(new physics.Box2D.b2Vec2(snap.vx, snap.vy));
+    marble.body.position.x = toPx(snap.x);
+    marble.body.position.y = toPx(snap.y);
+    marble.body.velocity.x = toPx(snap.vx);
+    marble.body.velocity.y = toPx(snap.vy);
+  }
+
+  // "순간이동" 방해기능: 마블을 지정한 px 좌표로 그대로 옮기고 속도를 0으로
+  // 초기화한다(스폰 직후 상태와 동일). xPx/yPx는 호출하는 쪽(marble-race.js)이
+  // course 좌표계(px) 기준으로 계산해서 넘긴다 — px<->m 변환은 여기서만 한다.
+  // 스턴으로 붙잡아 둔 자리(snap, 미터 단위)에 회전 막대 팔이 닿았는지 — 막대
+  // 팔은 (중심, 각도, 길이, 두께)인 회전 사각형이라, 마블 중심을 팔 기준 좌표로
+  // 돌려서 원-사각형 겹침으로 판정한다. 닿은 막대를 돌려주고, 없으면 null.
+  function findSpinnerTouching(physics, snap, radiusPx) {
+    const cx = toPx(snap.x);
+    const cy = toPx(snap.y);
+    for (const spinner of physics.spinners) {
+      const sx = spinner.body.position.x;
+      const sy = spinner.body.position.y;
+      const armAngles = spinner.arms >= 2 ? [spinner.angle, spinner.angle + Math.PI / 2] : [spinner.angle];
+      for (const angle of armAngles) {
+        const cos = Math.cos(-angle);
+        const sin = Math.sin(-angle);
+        const lx = (cx - sx) * cos - (cy - sy) * sin;
+        const ly = (cx - sx) * sin + (cy - sy) * cos;
+        const nearX = Math.max(-spinner.armLength / 2, Math.min(spinner.armLength / 2, lx));
+        const nearY = Math.max(-spinner.armThickness / 2, Math.min(spinner.armThickness / 2, ly));
+        if (Math.hypot(lx - nearX, ly - nearY) <= radiusPx) {
+          return spinner;
+        }
+      }
+    }
+    return null;
+  }
+
+  // 회전 막대에 맞은 마블을 막대가 도는 방향(접선) + 바깥쪽으로 쳐낸다.
+  function bounceOffSpinner(physics, marble, spinner) {
+    if (!marble._b2body) return;
+    const pos = marble._b2body.GetPosition();
+    const rx = pos.x - toM(spinner.body.position.x);
+    const ry = pos.y - toM(spinner.body.position.y);
+    const w = spinner._b2body.GetAngularVelocity();
+    let dx = -w * ry + rx * 0.5;
+    let dy = w * rx + ry * 0.5;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    // 펀치 난입(세로 6.5)과 비슷한 세기 — 결승 근처는 슬로모션(최대 0.2배)이라
+    // 이보다 약하면 화면에서 "튕겨 나간다"는 느낌이 거의 안 난다.
+    const strength = 7;
+    marble._b2body.ApplyLinearImpulseToCenter(new physics.Box2D.b2Vec2(dx * strength, dy * strength), true);
+  }
+
+  function teleportMarbleTo(physics, marble, xPx, yPx) {
+    if (!marble._b2body) return false;
+    marble._b2body.SetTransform(new physics.Box2D.b2Vec2(toM(xPx), toM(yPx)), marble._b2body.GetAngle());
+    marble._b2body.SetLinearVelocity(new physics.Box2D.b2Vec2(0, 0));
+    marble.body.position.x = xPx;
+    marble.body.position.y = yPx;
+    marble.body.velocity.x = 0;
+    marble.body.velocity.y = 0;
+    return true;
+  }
+
   function stepPhysics(physics, marbles, dtSeconds, simTime, goalY) {
     const { world, Box2D } = physics;
 
@@ -327,5 +407,18 @@
     return justFinished;
   }
 
-  global.MarblePhysics = { createPhysics, disposePhysics, spawnMarbles, stepPhysics, applyImpulse, impact, MARBLE_COLORS };
+  global.MarblePhysics = {
+    createPhysics,
+    disposePhysics,
+    spawnMarbles,
+    stepPhysics,
+    applyImpulse,
+    impact,
+    MARBLE_COLORS,
+    captureMarbleSnapshot,
+    applyMarbleSnapshot,
+    teleportMarbleTo,
+    findSpinnerTouching,
+    bounceOffSpinner,
+  };
 })(window);

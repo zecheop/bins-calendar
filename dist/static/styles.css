@@ -1182,7 +1182,7 @@ body[data-theme="dark"] .songbook-shell::before {
 
 .race-intrusion-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -1205,6 +1205,30 @@ body[data-theme="dark"] .songbook-shell::before {
 
 .race-intrusion-toggle:has(input:not(:checked)) {
   opacity: 0.5;
+}
+
+.race-intrusion-max-row {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.race-manual-effect-budget-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  background: rgba(255, 255, 255, 0.68);
+  color: #355164;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+body[data-theme="dark"] .race-manual-effect-budget-input {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-color: rgba(139, 92, 246, 0.28);
 }
 
 .race-intrusion-note {
