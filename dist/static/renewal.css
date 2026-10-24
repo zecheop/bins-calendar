@@ -270,3 +270,24 @@ body.is-intro .home-footer { animation: home-fade-in .9s ease both; animation-de
 /* 페이지 끝을 넘어 당겼을 때 보이는 바탕(기본 흰색)을 하단 메뉴 색과 맞춘다. */
 html:has(body[data-theme="light"]) { background-color: #f7f4fc; }
 html:has(body[data-theme="dark"]) { background-color: #0a0710; }
+
+/* ---------- 일정 탭 잠금 ----------
+   일정은 빈스가 쓰는 다른 사이트로 옮겨서, 이 사이트의 일정 화면은 흐리게 가리고
+   그 사이트로 가는 버튼 하나만 남긴다. */
+.viewer-shell .viewer-board { filter: blur(10px); opacity: .7; pointer-events: none; user-select: none; }
+.viewer-lock { position: absolute; inset: 0; z-index: 5; padding: 96px 16px 60px; }
+.viewer-lock-card {
+  position: sticky; top: calc(50vh - 70px); display: grid; justify-items: center; gap: 14px;
+  width: min(360px, 100%); margin: 12vh auto 0; padding: 26px 22px; border: 1px solid var(--rn-line); border-radius: 18px;
+  background: var(--rn-surface); color: var(--rn-ink); box-shadow: var(--rn-shadow); text-align: center;
+}
+.viewer-lock-title { margin: 0; font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
+.viewer-lock-link {
+  display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 22px; border-radius: 999px;
+  background: var(--rn-nav-active-bg); color: var(--rn-nav-active-ink); font-size: .92rem; font-weight: 700; text-decoration: none;
+}
+.viewer-lock-link:hover { filter: brightness(1.08); }
+.viewer-lock-link:focus-visible { outline: 2px solid var(--rn-accent-ink); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .viewer-lock { padding: 70px 14px calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
